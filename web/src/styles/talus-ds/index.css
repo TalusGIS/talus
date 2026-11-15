@@ -1,0 +1,25 @@
+/* ============================================================
+   TALUS DESIGN SYSTEM — vendored entry point (Talus 41).
+   Imported once from main.tsx BEFORE global.css so every var(--…)
+   token resolves app-wide.
+
+   Fonts: NOT loaded here. The self-hosted @fontsource-variable
+   packages (Inter + JetBrains Mono) are imported directly in
+   main.tsx — no Google-Fonts CDN (air-gapped-ready, F-fonts).
+
+   base.css joins the list in commit 2 (now): it restyles body/links/
+   headings/selection/focus through the tokens, alongside the global.css
+   token remap.
+
+   compat.css (added in the token-pipeline consolidation) holds the
+   legacy --color-* aliases that used to be minted at the top of
+   global.css. Keeping them here means talus-ds/ is now the SINGLE
+   home for every custom-property definition; global.css only *reads*
+   tokens. compat.css is a delete target — see its header.
+   ============================================================ */
+@import './colors.css';
+@import './themes.css';
+@import './typography.css';
+@import './spacing.css';
+@import './compat.css';
+@import './base.css';

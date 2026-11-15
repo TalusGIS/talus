@@ -1,0 +1,140 @@
+# Talus GIS — OpenFGA authorization model (Layer 7b, decision doc D2).
+#
+# Human-readable source of truth. The wire format actually loaded into OpenFGA is
+# model.json in this directory (the loader POSTs JSON to the HTTP API). This .fga
+# DSL and that JSON are equivalent — see the header of model.json for the exact,
+# verbatim-vs-D2 diff (it is whitespace + serialization only; no semantic change).
+
+model
+  schema 1.1
+
+type user
+
+type org
+  relations
+    define member: [user]
+
+type group
+  relations
+    # owner: the group's manager (creator, transferable). Mirrors layer/web_map/raster owner — gives
+    # a clean "who may manage membership/settings/delete this group" signal + a transfer story (Groups
+    # management UI, decision-groups-ui.md §5). App layer also admits talus-admin (manage_allowed pattern).
+    # A group with NO owner tuple (system groups, pre-registry seeds) is admin-managed by that same rule.
+    define owner: [user]
+    define member: [user]
+
+type layer
+  relations
+    # --- the four AGO sharing tiers ---
+    define owner: [user]                 # creator; from created_by
+    define org_shared: [org]             # "share to Organization"
+    define public_shared: [user:*]       # "share to Everyone (public)"
+    define shared_group: [group]         # additive group share(s)
+
+    # --- effective access (the unions AGO computes) ---
+    # can_view: all four tiers grant view.
+    define can_view: owner or public_shared or member from org_shared or member from shared_group
+    # can_edit_access: every tier EXCEPT public is a valid edit-access path.
+    # Public sharing is view-only — the anonymous public never gains an edit path.
+    define can_edit_access: owner or member from org_shared or member from shared_group
+
+# A saved Web Map (Talus 20, decision-webmap-save.md). It REUSES layer's four AGO sharing
+# tiers + the identical can_view union, so sharing later needs no second model reload. But a
+# web map is OWNER-EDITED config (a saved view over layers), not shared-editable data: there is
+# deliberately NO can_edit_access. shared_group / org_shared feed can_view ONLY — a shared map
+# is read-only to recipients. Update/delete = the owner relation OR admin-by-role, checked at
+# the app layer (like release_layer). Adding this type is additive: existing `layer` tuples and
+# checks are unaffected (tuples are model-independent). (F2.)
+type web_map
+  relations
+    define owner: [user]                 # creator; from created_by
+    define org_shared: [org]             # "share to Organization"
+    define public_shared: [user:*]       # "share to Everyone (public)"
+    define shared_group: [group]         # additive group share(s)
+
+    define can_view: owner or public_shared or member from org_shared or member from shared_group
+
+# A stored raster (Talus raster store-&-serve, decision-raster-store-serve.md). MIRRORS web_map:
+# the same four AGO sharing tiers + the identical can_view union, and deliberately NO
+# can_edit_access — a raster is OWNER-edited config (a stored COG; edit = re-upload/delete), not
+# shared-editable data. shared_group / org_shared feed can_view ONLY, so a shared raster is
+# read-only to recipients. Update/delete = the owner relation OR admin-by-role, checked at the app
+# layer (like web_map / release_layer). Adding this type is additive: existing `layer` / `web_map`
+# tuples and checks are unaffected (tuples are model-independent).
+type raster
+  relations
+    define owner: [user]                 # creator; from created_by
+    define org_shared: [org]             # "share to Organization"
+    define public_shared: [user:*]       # "share to Everyone (public)"
+    define shared_group: [group]         # additive group share(s)
+
+    define can_view: owner or public_shared or member from org_shared or member from shared_group
+
+# A Field project (.qgz intake & Import-URL door, decision-field-projects.md F2). MIRRORS
+# raster: the same four AGO sharing tiers + the identical can_view union, and deliberately NO
+# can_edit_access — a field project is an OWNER-edited OPAQUE artifact (edit = download ->
+# QGIS -> re-upload; Talus never opens it). shared_group / org_shared feed can_view ONLY, so a
+# shared project is read-only to recipients; can_view is exactly "who may fetch these bytes"
+# (the artifact may embed per-crew credentials, so the serving door checks this and nothing
+# else). public_shared exists for model symmetry but the v1 serving door has NO anon path —
+# the app layer never consults it there (decision F3). Update/delete = the owner relation OR
+# admin-by-role, checked at the app layer. Additive: existing tuples/checks unaffected.
+type field_project
+  relations
+    define owner: [user]                 # creator; from created_by
+    define org_shared: [org]             # "share to Organization"
+    define public_shared: [user:*]       # "share to Everyone (public)"
+    define shared_group: [group]         # additive group share(s)
+
+    define can_view: owner or public_shared or member from org_shared or member from shared_group
+
+# A Story map (Talus+ paid module, decision-story-maps.md F4). MIRRORS web_map: the same four
+# AGO sharing tiers + the identical can_view union, and deliberately NO can_edit_access — a
+# story map is OWNER-edited config (an ordered narrative over one web map), not shared-editable
+# data. shared_group / org_shared feed can_view ONLY, so a shared story is read-only to
+# recipients. Update/delete = the owner relation OR admin-by-role, checked at the app layer
+# (like web_map). The type lives in the CORE model on purpose — the authz model is
+# infrastructure, not the feature; without the paid module mounted no code path ever checks
+# story_map tuples. Additive: existing tuples/checks unaffected.
+type story_map
+  relations
+    define owner: [user]                 # creator; from created_by
+    define org_shared: [org]             # "share to Organization"
+    define public_shared: [user:*]       # "share to Everyone (public)"
+    define shared_group: [group]         # additive group share(s)
+
+    define can_view: owner or public_shared or member from org_shared or member from shared_group
+
+# A Dashboard (Talus+ paid module, decision-dashboards.md F4). MIRRORS web_map/story_map: the
+# same four AGO sharing tiers + the identical can_view union, and deliberately NO
+# can_edit_access — a dashboard is OWNER-edited config (a board of widgets over already-gated
+# reads), not shared-editable data. shared_group / org_shared feed can_view ONLY, so a shared
+# dashboard is read-only to recipients. Update/delete = the owner relation OR admin-by-role,
+# checked at the app layer (like web_map). Lives in the CORE model on purpose — the authz
+# model is infrastructure, not the feature; without the paid module mounted no code path ever
+# checks dashboard tuples. Additive: existing tuples/checks unaffected.
+type dashboard
+  relations
+    define owner: [user]                 # creator; from created_by
+    define org_shared: [org]             # "share to Organization"
+    define public_shared: [user:*]       # "share to Everyone (public)"
+    define shared_group: [group]         # additive group share(s)
+
+    define can_view: owner or public_shared or member from org_shared or member from shared_group
+
+# A Report (Talus+ paid module, decision-scheduled-reports.md F6). MIRRORS dashboard MINUS
+# public_shared: reports are NOT public-shareable in v1 (a report is a governed, dated document;
+# an anonymous download is the "ungoverned copy" alarm in decision §3). Three sharing tiers, the
+# can_view union without the public arm, and deliberately NO can_edit_access — a report is
+# OWNER-edited config. Anyone with can_view may TRIGGER a render and download artifacts (F9);
+# the render identity is always the owner, evaluated server-side. Update/delete = owner OR
+# admin-by-role at the app layer (like web_map). Lives in the CORE model on purpose — the authz
+# model is infrastructure, not the feature; without the paid module mounted no code path ever
+# checks report tuples. Additive: existing tuples/checks unaffected.
+type report
+  relations
+    define owner: [user]                 # creator; from created_by
+    define org_shared: [org]             # "share to Organization"
+    define shared_group: [group]         # additive group share(s)
+
+    define can_view: owner or member from org_shared or member from shared_group

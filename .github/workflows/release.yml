@@ -1,0 +1,156 @@
+# release.yml — the release pipeline for TalusGIS/talus. AUTHORED HERE, never synced from
+# the dev repo (the dev-side sync excludes this file so it survives `rsync --delete`).
+#
+# Two-phase cut (dev repo: decision-release-engineering.md §4):
+#   Phase 1 — `workflow_dispatch` builds api/ and pushes ghcr.io/talusgis/talus-api,
+#     printing the immutable digest in the job summary.
+#   Phase 2 — the dev-side sync pins that digest into docker-compose.yml, commits, and the
+#     tag push lands here: the `release` job VERIFIES the tagged tree is digest-pinned,
+#     emits CycloneDX SBOMs (source + image, via Trivy — the house scanner), publishes the
+#     image's open-source notices and the exact source of its GPL/LGPL/MPL components and its
+#     Debian packages (fetched and verified from the image's own NOTICES.json), and creates
+#     the GitHub Release with all of it attached. GitHub's own source tarball is the
+#     artifact; web/dist is committed, so it is self-contained (no node, no build tools).
+#
+# Open-source compliance: the image build runs with TALUS_RELEASE=1, so a third-party change
+# nobody reviewed (a new bundled library, a changed copyleft one, an unaudited architecture)
+# fails the build — see api/third_party_notices/. The image then carries its NOTICES at
+# /usr/share/doc/talus/NOTICES and names this release as the place its source is published.
+#
+# Supply-chain: no third-party actions beyond hash-pinned actions/checkout; tools run as
+# docker images — the same pattern as security.yml.
+name: release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Image tag to push (e.g. v0.9.0-beta.1)"
+        required: true
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build-image:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build + push api image, report digest
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Strict: the version names the image, its labels and its NOTICES, so nothing else gets through.
+          [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]] \
+            || { echo "version must look like vX.Y.Z or vX.Y.Z-pre (got: $VERSION)"; exit 1; }
+          echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker build \
+            --build-arg TALUS_RELEASE=1 --build-arg TALUS_VERSION="${VERSION}" \
+            --label org.opencontainers.image.source=https://github.com/TalusGIS/talus \
+            --label org.opencontainers.image.version="${VERSION}" \
+            --label org.opencontainers.image.licenses=AGPL-3.0-only \
+            --label com.talusgis.third-party.notices=/usr/share/doc/talus/NOTICES \
+            --label com.talusgis.third-party.source="https://github.com/TalusGIS/talus/releases/tag/${VERSION}" \
+            -t "ghcr.io/talusgis/talus-api:${VERSION}" api/
+          docker push "ghcr.io/talusgis/talus-api:${VERSION}"
+          DIGEST=$(docker inspect --format '{{index .RepoDigests 0}}' "ghcr.io/talusgis/talus-api:${VERSION}")
+          echo "### talus-api image pushed"                                  >> "$GITHUB_STEP_SUMMARY"
+          echo '```'                                                         >> "$GITHUB_STEP_SUMMARY"
+          echo "$DIGEST"                                                     >> "$GITHUB_STEP_SUMMARY"
+          echo '```'                                                         >> "$GITHUB_STEP_SUMMARY"
+          echo "Phase 2 (dev repo): sync-release.sh --version $VERSION --digest ${DIGEST#*@}" >> "$GITHUB_STEP_SUMMARY"
+          echo "DIGEST=$DIGEST"
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: read
+    steps:
+      # No git credential left in the checkout: this job holds contents: write, and the scanner below
+      # mounts the working tree.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify the tagged tree is digest-pinned (the two-phase contract)
+        run: |
+          grep -E 'image: ghcr\.io/talusgis/talus-api@sha256:[a-f0-9]{64}' docker-compose.yml \
+            || { echo "FAIL: docker-compose.yml api image is not digest-pinned — a tag must point at a pinned tree"; exit 1; }
+          if grep -nE '^[[:space:]]+build:' docker-compose*.yml; then
+            echo "FAIL: a compose file still contains a build: key"; exit 1
+          fi
+      - name: SBOMs — CycloneDX for source tree and image (Trivy)
+        # The scanner is pinned by digest, never a floating tag: this job can write the Release, so whoever
+        # controlled a mutable tag would control what it publishes. Trivy 0.72.0, the multi-arch index
+        # digest, the same scanner as the 2026-11-14 image scans; no published Trivy advisory affects it.
+        # The image is scanned from a saved archive mounted read-only: no Docker socket reaches the
+        # scanner's container. Scanning an archive names the SBOM after the file, so the last lines put
+        # the image's own digest-pinned reference back as its name.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TRIVY: aquasec/trivy:0.72.0@sha256:cffe3f5161a47a6823fbd23d985795b3ed72a4c806da4c4df16266c02accdd6f
+        run: |
+          docker run --rm -v "$PWD":/repo "$TRIVY" \
+            fs --skip-version-check --format cyclonedx --output /repo/talus-sbom-source.cdx.json /repo
+          IMG=$(grep -Eo 'ghcr\.io/talusgis/talus-api@sha256:[a-f0-9]{64}' docker-compose.yml | head -1)
+          echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker pull "$IMG"
+          docker tag "$IMG" "ghcr.io/talusgis/talus-api:${GITHUB_REF_NAME}"
+          docker save "ghcr.io/talusgis/talus-api:${GITHUB_REF_NAME}" -o "$RUNNER_TEMP/image.tar"
+          docker run --rm -v "$PWD":/repo -v "$RUNNER_TEMP/image.tar":/image.tar:ro "$TRIVY" \
+            image --skip-version-check --input /image.tar --format cyclonedx --output /repo/talus-sbom-image.cdx.json
+          rm -f "$RUNNER_TEMP/image.tar"
+          # The scanner's container runs as root, so the SBOM it wrote belongs to root: read it, write the
+          # named copy beside it, and move that over it (the working directory belongs to this job's user).
+          python3 - "$IMG" <<'PY'
+          import json, os, sys
+          path = "talus-sbom-image.cdx.json"
+          sbom = json.load(open(path))
+          component = sbom["metadata"]["component"]
+          component["name"] = sys.argv[1]
+          component.setdefault("properties", []).append({"name": "aquasecurity:trivy:RepoDigest", "value": sys.argv[1]})
+          with open(path + ".tmp", "w") as out:
+              json.dump(sbom, out, indent=2)
+          os.replace(path + ".tmp", path)
+          PY
+      - name: Open-source notices and third-party source, from the pinned image
+        # The image wrote its own NOTICES and NOTICES.json at build. Its GPL/LGPL/MPL components and
+        # its Debian packages are fetched at their exact versions and VERIFIED (PyPI/inventory sha256,
+        # snapshot.debian.org hashes, each .dsc's sums) by the api tree's own tool. Anything that cannot
+        # be fetched or verified fails here, before any Release exists. An image built before the
+        # image carried NOTICES.json fails too: rebuild it (phase 1) for this release.
+        run: |
+          IMG=$(grep -Eo 'ghcr\.io/talusgis/talus-api@sha256:[a-f0-9]{64}' docker-compose.yml | head -1)
+          CID=$(docker create "$IMG")
+          docker cp "$CID:/usr/share/doc/talus/NOTICES" ./NOTICES-api.txt
+          docker cp "$CID:/usr/share/doc/talus/NOTICES.json" ./NOTICES.json
+          docker rm "$CID" >/dev/null
+          IMGVER=$(python3 -c 'import json; print(json.load(open("NOTICES.json"))["version"])')
+          # The image's own record of its version names the release assets — check its shape before it
+          # reaches $GITHUB_ENV or a file name (an image built outside this workflow could carry anything).
+          [[ "$IMGVER" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]] \
+            || { echo "FAIL: the image's NOTICES.json names version '$IMGVER', not vX.Y.Z[-pre]"; exit 1; }
+          echo "IMGVER=$IMGVER" >> "$GITHUB_ENV"
+          mv NOTICES-api.txt "talus-api-${IMGVER}-NOTICES.txt"
+          ( cd api && python3 -m third_party_notices sources --notices ../NOTICES.json --out ../release-sources )
+          ls -la release-sources/*.tar
+      - name: Create the GitHub Release with SBOMs, notices and third-party source attached
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            talus-sbom-source.cdx.json talus-sbom-image.cdx.json \
+            "talus-api-${IMGVER}-NOTICES.txt" release-sources/*.tar \
+            --title "Talus GIS $GITHUB_REF_NAME" \
+            --notes "Talus GIS $GITHUB_REF_NAME. See CHANGELOG.md. The source archive is self-contained (built web/dist committed; the api image is pulled from ghcr, digest-pinned in docker-compose.yml). SBOMs (CycloneDX, source + image) attached.
+
+          Third-party source: the api image includes components licensed under the GPL, LGPL and MPL. Their complete corresponding source is attached below: talus-api-${IMGVER}-third-party-source.tar (the components in section 2 of the image's notices) and talus-api-${IMGVER}-debian-source.tar (its Debian packages). Notices: NOTICES at the root of this release, talus-api-${IMGVER}-NOTICES.txt below, and /usr/share/doc/talus/NOTICES inside the image."

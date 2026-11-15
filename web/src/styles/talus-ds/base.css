@@ -1,0 +1,53 @@
+/* ============================================================
+   TALUS — base resets & primitives.
+   Lightweight. Components style themselves via tokens.
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--text-body);
+  background: var(--surface-page);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Headings default to tight Inter display */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  color: var(--text-strong);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-tight);
+  margin: 0;
+}
+
+a { color: var(--text-link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+code, kbd, samp { font-family: var(--font-mono); font-size: 0.92em; }
+
+::selection { background: var(--amber-300); color: var(--slate-900); }
+
+/* Eyebrow / caps label — the brand's "OPEN. INTELLIGENT. GIS." treatment */
+.talus-eyebrow {
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--blue-400);
+}
+
+/* Mono data label — coordinates, attribute values */
+.talus-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* Focus visibility */
+:focus-visible { outline: none; box-shadow: var(--ring); border-radius: var(--radius-xs); }

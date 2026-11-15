@@ -1,0 +1,36 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    /* Linting — strict mode on */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+
+    /* Path aliases (keep in sync with vite.config.ts). Relative `paths` resolve against this
+       file's directory — no `baseUrl`, which TS 6 deprecates.
+       "@paid": first entry that EXISTS wins — the Talus+ web entry in the dev repo, the inert
+       stub in the public repo (paid/ never crosses the release MANIFEST). Bare deps in paid
+       files resolve through the committed paid/web/node_modules symlink. */
+    "paths": {
+      "@/*": ["./src/*"],
+      "@paid": ["../paid/web/src/index.tsx", "./src/paid-stub.tsx"]
+    }
+  },
+  "include": ["src", "../paid/web/src"]
+}

@@ -1,0 +1,57 @@
+/* ============================================================
+   TALUS — LEGACY COMPAT LAYER  (quarantined bridge)
+
+   These `--color-*` aliases bridge the pre-Talus-41 BEM rules in
+   global.css to the DS semantic tokens. They were previously minted
+   in a `:root` block at the TOP of global.css — extracted here so that
+   EVERY custom-property DEFINITION lives under styles/talus-ds/ and
+   nothing is minted inside the 8,000-line global.css anymore.
+
+   This file is a DELETE TARGET, and it is SHRINKING. As global.css
+   rules are migrated to read the semantic aliases directly, retire an
+   alias and delete its line. When the list is empty, remove the file
+   and its import from index.css. `check-tokens.mjs` enforces both
+   halves: no NEW token definitions outside talus-ds/, and no NEW
+   `--color-*` alias joining this list (see COMPAT_SURVIVORS there).
+
+   LOAD-BEARING — do not delete these two (counts at handoff-auth-
+   opendata-4 §6.3, verified against cfb0bcd):
+     --color-muted   95 readers
+     --color-text    73 readers
+   They map HONESTLY (muted->muted, text->text), so they are a naming
+   debt, not a correctness one, and can be swept mechanically whenever
+   someone wants the churn.
+
+   RETIRED, and why — so nobody re-adds them:
+     --color-accent  was `var(--brand)`. The name LIED: "accent" in the
+                     DS means amber/high-signal/sparing, but this
+                     resolved to brand blue. All 40 readers were
+                     actions (focus rings, active tabs, spinners, brand
+                     fills) and now say `var(--brand)` directly.
+     --color-bg      was `var(--surface-page)`, and did TWO jobs — page
+                     surface AND on-brand text colour. The second job
+                     was a dark-mode contrast bug (#0d1117 on #2f6aa3 ~
+                     3.2:1, under AA) across 11 sites, now
+                     `var(--text-inverse)`. Its one honest reader
+                     (`body`) reads `--surface-page` directly.
+
+   NEVER DEFINED, so they always fell through to a hardcoded hex and
+   never flipped theme — now real tokens, listed so the pattern is
+   recognisable if it recurs:
+     --color-danger --color-primary --color-success --color-surface
+     --color-link
+   ============================================================ */
+:root {
+  --color-muted: var(--text-muted);
+  --color-text: var(--text-strong);
+
+  /* Canonical max content width for top-level pages (see .page in global.css).
+     Single source so every page — and any new one — sizes identically. */
+  --page-max: 84rem;
+
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+}

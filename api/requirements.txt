@@ -1,0 +1,52 @@
+fastapi>=0.141.1,<0.142.0
+uvicorn[standard]>=0.52.4,<0.53.0
+# Pinned exactly, on purpose: psycopg-binary is LGPL and publishes no source of its own, so its source line in
+# third_party_notices/inventory.toml is traced by hand for ONE version. Move this pin only together with that
+# row (and the two bundled-library rows that name the wheel); a floating range stops a release build the day
+# upstream publishes.
+psycopg[binary,pool]==3.3.9
+pydantic>=2.13.5,<3.0.0
+pydantic-settings>=2.15.0,<3.0.0
+pyjwt[crypto]>=2.13.0,<3.0.0
+# Secrets-at-rest house pattern (decision-geocoder-token-locators.md §3 F1): app/secrets.py Fernet
+# over TALUS_ENCRYPTION_KEY. Was already in the tree transitively via pyjwt[crypto] — pinned
+# explicitly now that app code imports it directly.
+cryptography>=50.0.1,<51.0.0
+structlog>=26.1.0,<27.0.0
+httpx>=0.28.1,<0.29.0
+# Multipart form parsing for FEATURE ATTACHMENT uploads (decision-attachments.md A-1) + the GeoServices
+# addAttachment endpoint (A-2). starlette needs this for any UploadFile/File(...) route; I-3 deliberately
+# avoided it for urlencoded façade bodies (hand-parsed), but a real binary file upload needs true multipart.
+python-multipart>=0.0.32,<0.1.0
+minio>=7.2.20,<8.0.0
+pyshp>=3.1.6,<4.0.0   # pure-Python Shapefile writer (Open Data export, Talus 33) — no GDAL
+# GeoParquet INGEST (decision-geoparquet-ingest.md F2): pyarrow reads the parquet table; PostGIS does
+# ALL geometry work (WKB via ST_GeomFromWKB — no shapely/pandas/geopandas, and the GDAL boundary above
+# stays raster-only). Ceiling-pinned; core parquet module is the only surface used.
+pyarrow>=25.0.1,<26.0.0
+# Raster store & serve (V045+): rio-tiler serves COG tiles dynamically EMBEDDED IN THE api (no separate
+# titiler daemon — keeps the docker-compose-up install simple); rio-cogeo validates/inspects uploaded COGs at
+# ingest. Both pull rasterio, whose manylinux wheel BUNDLES GDAL — so no apt GDAL on slim-bookworm
+# (glibc). This is the deliberate GDAL dependency the raster slice accepts (cf. pyshp's "no GDAL").
+rio-tiler>=9.4.3,<10.0.0
+rio-cogeo>=7.0.2,<8.0.0
+# Attachment thumbnails (decision-attachments-a4.md §3.3): on-the-fly ≤256px JPEG for the popup strip.
+# Plain Pillow only — HEIC decoding (pillow-heif) deliberately NOT pulled in; undecodable → file chip.
+pillow>=12.3.0,<13.0.0
+
+# Talus+ reports F7-B (decision-scheduled-reports.md r8): fill a customer's .docx template by
+# string replacement into run text (XML-escaped by the library — never a template language).
+# MIT; pulls lxml (BSD-3; its wheel bundles libxml2/libxslt, listed in the image's third-party notices).
+python-docx>=1.2.0,<2.0.0
+
+# SQL-source pull (decision-sql-source-pull.md F4, RULED 2026-09-25): the SQL Server dialect over a PURE-PYTHON
+# TDS driver — MIT, no native layer, passes the licence allowlist with no exception (msodbcsql is a Microsoft
+# EULA, FreeTDS/pymssql are LGPL). Spike 2026-10-01: 109k rows/s, flat memory.
+# ★ TLS: pytds encrypts only through pyOpenSSL, and every pyOpenSSL release caps `cryptography<47` while this
+# file pins `cryptography>=50`. RULED (F4 addendum, 2026-10-01): app/sqlsource/tds_tls.py carries the same
+# channel on the standard library and is installed into pytds at call time. It reads pytds INTERNALS, so the
+# version is pinned EXACTLY; `check_internals()` + api/tests/test_sql_source_tds_tls.py make a bump that moves
+# them fail here, never on a customer. Exit: when a pyOpenSSL release accepts cryptography>=50, delete the
+# shim, loosen this pin, add pyOpenSSL back.
+python-tds==1.17.1
+PyMySQL==1.2.3               # MySQL / MariaDB dialect (decision-sql-source-pull.md §14) — MIT, pure Python

@@ -1,0 +1,38 @@
+# Where every licence text in this directory came from: the exact URL fetched and the sha256 of what it returned.
+# Each text is taken from the project's own repository at the version bundled (npm: the installed package's own files).
+
+["@protomaps__basemaps"]
+files = [
+  { file = "LICENSE.md", url = "https://raw.githubusercontent.com/protomaps/basemaps/42ffaaa4a85a41bfcb23e43cc0f5b492a5eca123/LICENSE.md", sha256_of_download = "74f975cfedd168098c43b5cfd6e587e40604684c4ffcec3e90d24b3b09c061b0" },
+]
+
+["basemap-sprites"]
+files = [
+  { file = "LICENSE.md", url = "https://raw.githubusercontent.com/tangrams/icons/92510779634f4a006c61ea70e50cb8c52c765a81/LICENSE.md", sha256_of_download = "46d0ca73c10d7366ef7bf3932d8508267096393ccc9ef3a41d1b1d1fe37023f1" },
+]
+
+["murmurhash-js"]
+files = [
+  { file = "LICENSE-from-README.md", url = "npm:murmurhash-js/README.md", sha256_of_download = "e137ced8967fc334ec9b5fc5c8500992f9e49d2e9cc0f6e2439e46af2f2481a4", excerpt = "text from: ## License" },
+]
+
+["pmtiles"]
+files = [
+  { file = "LICENSE", url = "https://raw.githubusercontent.com/protomaps/PMTiles/aec8fa1341222fdddb3318e9ffa8e18e19b312f7/LICENSE", sha256_of_download = "0371c38f338835f7fc13ed71176f3d92144e22c8b736a31cced57adbbeb647b3" },
+]
+
+["qrcode-generator"]
+files = [
+  { file = "LICENSE", url = "https://raw.githubusercontent.com/kazuhikoarase/qrcode-generator/js2.0.4/LICENSE", sha256_of_download = "3a850fa5f08101db6f40676c2786e10bd2cd5fff7b12ffdf1e0c434d4e49d90c" },
+]
+
+["terra-draw"]
+files = [
+  { file = "LICENSE", url = "https://raw.githubusercontent.com/JamesLMilner/terra-draw/terra-draw@1.33.0/LICENSE", sha256_of_download = "78f5dfcbb9d43a76b4919d79dbd23381bb9cb48b4b40e49c050bbc175e3e7e28" },
+]
+
+["terra-draw-maplibre-gl-adapter"]
+files = [
+  { file = "LICENSE", url = "https://raw.githubusercontent.com/JamesLMilner/terra-draw/terra-draw-maplibre-gl-adapter@1.4.1/LICENSE", sha256_of_download = "78f5dfcbb9d43a76b4919d79dbd23381bb9cb48b4b40e49c050bbc175e3e7e28" },
+]
+

@@ -1,0 +1,88 @@
+# docker-compose.drill.yml — Talus 44 clean-host restore-drill OVERLAY (docs/decision-restore-drill.md §3 F-isolation).
+#
+# Apply ONLY layered on the REAL compose, under the dedicated drill project:
+#     docker compose -f docker-compose.yml -f docker-compose.drill.yml -p talus-restoredrill ...
+# scripts/restore-drill.sh does this for you (and guards the project name before any `down -v`). Never run this
+# overlay without `-p talus-restoredrill` — the project name is what scopes the volumes and the destroy guard.
+#
+# WHY AN OVERLAY (not a standalone twin): a faithful "our server is toast, rebuild it" drill must exercise the
+# REAL deployment artifact (docker-compose.yml) with the operator's `.env`, so a broken real compose can't hide
+# behind a hand-maintained twin that silently drifted. This overlay therefore changes ONLY what co-location
+# with the LIVE stack physically forces — images, volumes, healthchecks, commands, and every secret/ID come
+# from the real compose + the drill PROJECT NAME + `--env-file <restored .env>`, untouched:
+#
+#   - container_name: !reset null  -> drop the live `talusgis-*` name so Compose auto-names `talus-restoredrill-<svc>-1`.
+#                                     Project-scoped, so it CANNOT collide with a live container (a forgotten
+#                                     reset would fail loudly on the global live name, never touch live).
+#   - ports: !override [...] / !reset [] -> NEVER bind the live 5432/8080/8000. `!override` REPLACES the live
+#                                     publication with the drill's (api 18000, keycloak 18080) so the end-to-end
+#                                     login is exercised over a real published path; postgres uses `!reset []` to
+#                                     drop its live 5432 entirely (reached via `compose exec`). The DBs /
+#                                     OpenFGA stay internal-only as in live. (NB: `!reset [list]` only CLEARS —
+#                                     it ignores the list — so a *replacement* port must use `!override`.)
+#   - host-public env relocated    -> the new "host" address for the rebuilt portal (KEYCLOAK_ISSUER / KC_HOSTNAME).
+#                                     KEYCLOAK_JWKS_URL stays the INTERNAL service name (unchanged). The master-key
+#                                     half of `.env` (OpenFGA store/model IDs, DB passwords, client secrets, age
+#                                     recipients) still rides `--env-file` verbatim — exactly the real
+#                                     new-host split (topology changes; the master key does not).
+#   - BACKUP_ENABLED: "false"      -> the drill is RESTORING, not backing up: its api must never run the backup
+#                                     scheduler (it would write into the drill's own storage volume; pointless + noisy).
+#
+# Volumes are project-scoped automatically (talus-restoredrill_*), disjoint from live (<your-project>_*) — no
+# override needed. The drill simply never `up`s the services a restore doesn't use: `flyway` (it restores dumps,
+# it does NOT migrate), `caddy`, and `pg_tileserv`. They stay defined-but-unstarted.
+#
+# Topology note (validated on first run): Keycloak's relocated KC_HOSTNAME pins the token `iss` to
+# http://localhost:18080/realms/talus, which the api's relocated KEYCLOAK_ISSUER matches — so a token minted
+# against the published Keycloak validates on the published api.
+
+services:
+  postgres:
+    container_name: !reset null
+    ports: !reset []            # drop the live 5432 publication; the drill DB is reached via `compose exec`
+
+  keycloak-postgres:
+    container_name: !reset null
+
+  openfga-postgres:
+    container_name: !reset null
+
+  openfga-migrate:
+    container_name: !reset null
+
+  openfga:
+    container_name: !reset null
+
+  keycloak:
+    container_name: !reset null
+    ports: !override ["127.0.0.1:18080:8080"]   # REPLACE the live 8080 publication (never bind it); !override sets, !reset only clears
+    environment:
+      # Relocate the public auth address to the drill's published port so the issued token `iss` matches the
+      # api's relocated KEYCLOAK_ISSUER below. KC_HOSTNAME_STRICT=false + KC_HTTP_ENABLED=true are inherited.
+      KC_HOSTNAME: http://localhost:18080
+
+  api:
+    container_name: !reset null
+    ports: !override ["127.0.0.1:18000:8000"]   # REPLACE the live 8000 publication (never bind it); !override sets, !reset only clears
+    environment:
+      # Match the relocated Keycloak issuer (above). KEYCLOAK_JWKS_URL stays the internal service-name URL
+      # (inherited) — the api fetches signing keys over the drill network, not the published port.
+      KEYCLOAK_ISSUER: http://localhost:18080/realms/talus
+      # The drill restores; it must not run its own backup scheduler.
+      BACKUP_ENABLED: "false"
+      # The drill starts the core api only. The Talus+ modules are not part of this copy of the stack
+      # (on a Talus+ server they come from compose.plus.fragment.yml, which the drill does not merge), so
+      # a module list inherited from .env would name code that is not here and stop the api at boot.
+      # The drill proves that the databases and the media come back and that sign-in and authorization
+      # work on them; it does not exercise the Talus+ screens.
+      TALUS_EXTRA_MODULES: ""
+
+  # Services the drill never `up`s (flyway = it restores dumps, not migrates; caddy/pg_tileserv = not asserted).
+  # We still drop their live container names so NOTHING in the drill project can collide with a live container,
+  # even under a fat-fingered `up`. Defense in depth for the isolation guarantee.
+  flyway:
+    container_name: !reset null
+  pg_tileserv:
+    container_name: !reset null
+  caddy:
+    container_name: !reset null

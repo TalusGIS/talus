@@ -1,0 +1,66 @@
+# Local env / secrets
+.env
+
+# Local development fixtures. Never committed — like .env, it's per-machine dev state.
+.dev-entitlement/
+
+# Local compose overrides. Untracked BY DESIGN.
+docker-compose.override.yml
+
+# Generated per-environment files. Like .env: produced by a
+# script, environment-specific, never committed.
+scripts/7b-subjects.env
+scripts/19-service-accounts.env
+
+# Local data files — never commit
+db/seeds/*.csv
+
+# Database dumps / backups — never commit (taken around migrations)
+*.dump
+*.sql.gz
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Scratch / legacy
+phase-0/
+tempdata/
+
+# Local tool config (machine-specific, not shared)
+.claude/settings.local.json
+.claude/launch.json
+.claude/*.bak*
+
+# Local design reference — not committed.
+/design-system/
+
+# Talus 48 SSO login theme — self-hosted fonts (woff2). Dropped at build/deploy time from the SPA's
+# @fontsource-variable deps (see keycloak/themes/talus/login/resources/fonts/README.md); the page
+# falls back to system fonts if absent. Binaries are not vendored into git.
+keycloak/themes/talus/login/resources/fonts/*.woff2
+
+# Rendered per-deployment realm (scripts/render-realm.sh output; secrets inside). The
+# shipped artifact is keycloak/realm-export.template.json — no secrets, no users.
+keycloak/realm-export.json
+keycloak/import/
+.env.replaced-*
+
+# Belt-and-braces: ignore EVERY .env variant except the example — a
+# preserved/renamed env file must never be committable by pattern-miss.
+.env.*
+!.env.example
+
+# 9a: deployment-generated SPA runtime config (install.sh --edge writes it)
+proxy/config/config.json
+
+# Build output — artifacts, never tracked.
+dist-plus/

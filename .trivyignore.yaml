@@ -1,0 +1,37 @@
+# Trivy ignore file — each entry is a tracked, deliberate exception, not a blanket suppression.
+#
+# ★ WHY THE YAML FORMAT (migrated from plain .trivyignore, 2026-09-09): only this format supports
+# `expired_at`. An accepted finding that cannot expire quietly becomes a permanent one — the real
+# risk with any suppression is not the initial call, it is that the call outlives its reasoning and
+# nobody notices. Trivy applies an entry ONLY BEFORE its expired_at date; after it the finding
+# returns and CI goes red. So every entry here MUST carry a date, and the date is a forcing
+# function, not a note.
+#
+# Referenced explicitly by .github/workflows/security.yml (--ignorefile /repo/.trivyignore.yaml).
+# Adding an entry without `expired_at` defeats the point of this file — don't.
+
+vulnerabilities:
+  - id: CVE-2026-85061
+    statement: |-
+      MapLibre GL JS: XSS sanitizer bypass in DOM.sanitize(). CRITICAL. ACCEPTED because the flaw is
+      not in what Talus ships, and was never reachable in Talus:
+
+        1. FIXED UPSTREAM IN THE VERSION TALUS SHIPS. Talus pins maplibre-gl 5.24.1 (released
+           2026-11-11), the 5.x patch release that carries the fix: its sanitizer is an allow-list
+           of tags, attributes and link protocols, and the attribution control inserts built nodes
+           instead of assigning markup. Read in the installed package, 2026-11-14.
+        2. WHY A SCANNER STILL REPORTS IT. The advisory's record lists only 6.4.1 as the fixed
+           version, so a scanner flags every 5.x release, 5.24.1 included. This entry exists for
+           that reason alone. Remove it when the advisory record names 5.24.1, or when Talus moves
+           to MapLibre 6, whichever comes first.
+        3. NOT REACHABLE IN TALUS REGARDLESS (re-checked 2026-11-14). The sanitizer is called from
+           one place, the attribution control. Every attribution string in this tree is a fixed
+           literal written here (Protomaps, OpenStreetMap, USGS); none comes from service metadata,
+           item metadata or user input. Popups use setDOMContent or setText, never setHTML. External
+           layers are added as `tiles:` sources, for which MapLibre fetches no TileJSON, and the
+           basemap archive's own attribution is not passed to the map.
+
+      RE-CHECK IMMEDIATELY, regardless of the date below, if either trigger fires: the add-from-URL
+      path gains a `url:`-style source, or anything starts setting `attribution` from service
+      metadata.
+    expired_at: 2027-03-01

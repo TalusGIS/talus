@@ -1,0 +1,110 @@
+/* ============================================================
+   TALUS — COLOR TOKENS
+   Brand: deep cartographic blue + amber survey accent.
+   Base palette → semantic aliases. Reference semantics in UI.
+   ============================================================ */
+:root {
+  /* ---- Brand: Talus Blue (the "T" letterform) ---- */
+  --blue-950: #0c1f33;
+  --blue-900: #11304f;
+  --blue-800: #163f66;
+  --blue-700: #1f4d7a;   /* CORE BRAND BLUE — logo */
+  --blue-600: #2a5f93;
+  --blue-500: #3a72ab;
+  --blue-400: #5a7a9a;   /* muted slate-blue — logo subtitle */
+  --blue-300: #8aa6c2;
+  --blue-200: #bcd0e2;
+  --blue-100: #dde8f1;
+  --blue-50:  #eef4f9;
+
+  /* ---- Accent: Survey Amber (the TIN node motif) ---- */
+  --amber-700: #b45309;
+  --amber-600: #d97706;
+  --amber-500: #f59e0b;  /* CORE ACCENT — logo nodes */
+  --amber-400: #fbbf24;
+  --amber-300: #fcd34d;
+  --amber-100: #fef3c7;
+  --amber-50:  #fffbeb;
+
+  /* ---- Neutrals: cool slate (cartographic gray) ---- */
+  --slate-950: #0b0f14;
+  --slate-900: #11161d;
+  --slate-800: #1f2937;  /* monochrome logo ink */
+  --slate-700: #334155;
+  --slate-600: #475569;
+  --slate-500: #64748b;
+  --slate-400: #94a3b8;
+  --slate-300: #cbd5e1;
+  --slate-200: #e2e8f0;
+  --slate-150: #eaeff4;
+  --slate-100: #f1f5f9;
+  --slate-50:  #f8fafc;
+  --white:     #ffffff;
+
+  /* ---- Map / data feature colors (legend swatches) ---- */
+  --geo-water:    #2a5f93;
+  --geo-terrain:  #8a6d3b;
+  --geo-forest:   #2f7d54;
+  --geo-route:    #f59e0b;
+  --geo-boundary: #9333ea;
+  --geo-heat:     #e0492f;
+
+  /* ---- Status ---- */
+  --success-600: #15803d;
+  --success-500: #22a559;
+  --success-50:  #ecfdf3;
+  --warning-600: #b45309;
+  --warning-500: #f59e0b;
+  --warning-50:  #fffbeb;
+  --danger-600:  #c0392b;
+  --danger-500:  #e0492f;
+  --danger-50:   #fdf2f0;
+  --info-600:    #1f4d7a;
+  --info-500:    #3a72ab;
+  --info-50:     #eef4f9;
+
+  /* ============================================================
+     SEMANTIC ALIASES — reference THESE in components
+     ============================================================ */
+  /* Surfaces */
+  --surface-page:    var(--slate-50);
+  --surface-card:    var(--white);
+  --surface-sunken:  var(--slate-100);
+  --surface-raised:  var(--white);
+  --surface-inverse: var(--blue-900);
+  --surface-panel:   var(--white);
+  --surface-overlay: rgba(12, 31, 51, 0.55);
+
+  /* Text */
+  --text-strong:   var(--slate-900);
+  --text-body:     var(--slate-700);
+  --text-muted:    var(--slate-500);
+  --text-subtle:   var(--slate-400);
+  --text-inverse:  var(--white);
+  /* the readable ink ON --surface-inverse (which flips per theme; --text-inverse is white in both —
+     the Talus Field notice went white-on-near-white on the dark theme, f3f). Same shape as
+     --text-onaccent. */
+  --text-oninverse: var(--white);
+  --text-brand:    var(--blue-700);
+  --text-link:     var(--blue-600);
+  --text-onaccent: var(--slate-900);
+
+  /* Borders */
+  --border-subtle:  var(--slate-200);
+  --border-default: var(--slate-300);
+  --border-strong:  var(--slate-400);
+  --border-brand:   var(--blue-700);
+  --border-focus:   var(--blue-500);
+
+  /* Brand / interactive */
+  --brand:          var(--blue-700);
+  --brand-hover:    var(--blue-800);
+  --brand-active:   var(--blue-900);
+  --brand-subtle:   var(--blue-50);
+  --accent:         var(--amber-500);
+  --accent-hover:   var(--amber-600);
+  --accent-subtle:  var(--amber-50);
+
+  /* Focus ring */
+  --ring: 0 0 0 3px rgba(58, 114, 171, 0.35);
+}

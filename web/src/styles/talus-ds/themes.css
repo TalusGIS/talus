@@ -1,0 +1,73 @@
+/* ============================================================
+   TALUS — DARK THEME
+   Activated by `data-theme="dark"` on <html> (or any ancestor).
+   Components read SEMANTIC aliases + a handful of tint ramp
+   steps; we remap both here so the whole system reskins.
+   Base brand hues (blue-700, amber-500) keep their identity;
+   only the tint/surface steps and aliases flip.
+   ============================================================ */
+[data-theme="dark"] {
+  /* ---- neutral surfaces & borders (remapped slate steps) ---- */
+  --slate-50:  #0d1117;   /* deepest — page */
+  --slate-100: #1b212b;   /* sunken / neutral tint */
+  --slate-150: #222a35;
+  --slate-200: #2b333f;   /* hairline borders */
+  --slate-300: #3a4451;   /* mid surfaces / off-states */
+  --slate-400: #5d6a7a;   /* strong borders / subtle text */
+  --slate-500: #8a96a6;
+  --slate-600: #5b6675;   /* solid neutral chip */
+  --slate-700: #c4cedb;   /* neutral chip text / body */
+
+  /* ---- tint backgrounds (subtle fills on dark) ---- */
+  --blue-50:    #15273a;
+  --blue-100:   #1d3148;
+  --amber-50:   #2a2113;
+  --amber-100:  #3a2c14;
+  --success-50: #112619;
+  --warning-50: #2a2113;
+  --danger-50:  #2a1614;
+
+  /* ---- accent text that sits on those tints (lightened) ---- */
+  --blue-700:    #7fa8d6;   /* brand text / icons on tints */
+  --amber-700:   #f0b24a;
+  --success-600: #4ec27c;
+  --warning-600: #e6a23c;
+  --danger-600:  #e8786c;
+
+  /* ============================================================
+     SEMANTIC ALIASES — dark
+     ============================================================ */
+  --surface-page:    #0d1117;
+  --surface-card:    #161c24;
+  --surface-sunken:  #11161d;
+  --surface-raised:  #1d242e;
+  --surface-inverse: #e6edf5;
+  --surface-panel:   #161c24;
+  --surface-overlay: rgba(2, 6, 12, 0.66);
+
+  --text-strong:   #f0f4f9;
+  --text-body:     #c4cedb;
+  --text-muted:    #8d99a9;
+  --text-subtle:   #6b7585;
+  --text-inverse:  #ffffff;
+  --text-oninverse: #11161d; /* on the dark theme's LIGHT inverse surface */
+  --text-brand:    #7fa8d6;
+  --text-link:     #8fb4dd;
+  --text-onaccent: #0b0f14;
+
+  --border-subtle:  #232b35;
+  --border-default: #2f3946;
+  --border-strong:  #3e4956;
+  --border-brand:   #3a72ab;
+  --border-focus:   #5a8fc4;
+
+  --brand:         #2f6aa3;
+  --brand-hover:   #3f7eba;
+  --brand-active:  #1f4d7a;
+  --brand-subtle:  #15273a;
+  --accent:        #f59e0b;
+  --accent-hover:  #fbbf24;
+  --accent-subtle: #2a2113;
+
+  --ring: 0 0 0 3px rgba(90, 143, 196, 0.40);
+}

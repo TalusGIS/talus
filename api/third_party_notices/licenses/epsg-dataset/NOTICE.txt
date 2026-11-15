@@ -1,0 +1,7 @@
+The PROJ library's reference database, in this image at the path above and at
+/usr/local/lib/python3.12/site-packages/rasterio/proj_data/proj.db, contains the EPSG Geodetic Parameter
+Dataset, which is owned by IOGP (the International Association of Oil and Gas Producers) and is used under
+its terms of use, https://epsg.org/terms-of-use.html. In both copies Talus has marked three records
+deprecated: the operations "NAD83(HARN) to WGS 84 (2)" and "(3)" and "NAD83(CSRS) to WGS 84 (2)" (EPSG
+codes 1900, 1901 and 1946); those three records are not EPSG's data as published. Every other record is
+unchanged.

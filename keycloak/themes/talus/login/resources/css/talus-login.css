@@ -1,0 +1,223 @@
+/* ============================================================
+   TALUS GIS — Keycloak login theme (Talus 48)
+   A reskin of the stock keycloak login theme to the T41 design
+   system: brand blue (#1f4d7a) + amber accent (#f59e0b), Inter /
+   JetBrains Mono. Light-mode login surface (login pages read best
+   light); values are hardcoded from web/src/styles/talus-ds so the
+   sign-in page matches the portal without importing the SPA bundle.
+
+   Markup targeted is Keycloak's classic login template (login.ftl):
+   .login-pf / #kc-header / .card-pf / #kc-form-login / #kc-login /
+   .kc-social-links. We override appearance only — no .ftl changes.
+   ============================================================ */
+
+/* ---- Self-hosted fonts (air-gapped-safe). Drop the .woff2 files into
+   ../fonts/ (see fonts/README.md). If absent, the system fallbacks below
+   keep the page clean — no network request is ever made. ---- */
+@font-face {
+  font-family: 'Inter Variable';
+  src: url('../fonts/InterVariable.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-display: swap;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'JetBrains Mono Variable';
+  src: url('../fonts/JetBrainsMono.woff2') format('woff2-variations');
+  font-weight: 100 800;
+  font-display: swap;
+  font-style: normal;
+}
+
+:root {
+  --talus-blue-700: #1f4d7a;   /* core brand */
+  --talus-blue-800: #163f66;
+  --talus-blue-900: #11304f;
+  --talus-blue-500: #3a72ab;
+  --talus-blue-50:  #eef4f9;
+  --talus-amber-500: #f59e0b;  /* accent */
+  --talus-amber-600: #d97706;
+  --talus-slate-900: #11161d;
+  --talus-slate-700: #334155;
+  --talus-slate-500: #64748b;
+  --talus-slate-300: #cbd5e1;
+  --talus-slate-200: #e2e8f0;
+  --talus-slate-50:  #f8fafc;
+  --talus-white: #ffffff;
+  --talus-danger: #c0392b;
+
+  --talus-font-sans: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --talus-radius: 10px;
+  --talus-ring: 0 0 0 3px rgba(58, 114, 171, 0.35);
+}
+
+/* ---- Page ---- */
+html, body, .login-pf, .login-pf body {
+  background: var(--talus-slate-50) !important;
+  font-family: var(--talus-font-sans) !important;
+  color: var(--talus-slate-900);
+}
+.login-pf body {
+  background-image: none !important;  /* drop the stock PatternFly background image */
+}
+
+/* ---- Header / brand ---- */
+#kc-header,
+#kc-header-wrapper {
+  color: var(--talus-blue-700) !important;
+  font-family: var(--talus-font-sans) !important;
+  font-weight: 700;
+  font-size: 1.5rem;
+  letter-spacing: -0.01em;
+  text-shadow: none !important;
+  padding: 1.25rem 0;
+}
+
+/* ---- Card ---- */
+.card-pf {
+  border: 1px solid var(--talus-slate-200) !important;
+  border-radius: var(--talus-radius) !important;
+  box-shadow: 0 8px 28px rgba(17, 48, 79, 0.10) !important;
+  background: var(--talus-white) !important;
+  padding: 2rem 2.25rem 2.25rem !important;
+}
+
+#kc-page-title {
+  font-weight: 650;
+  color: var(--talus-slate-900);
+}
+
+/* ---- Labels + inputs ---- */
+.pf-c-form__label,
+label,
+#kc-form-login label {
+  color: var(--talus-slate-700) !important;
+  font-weight: 550;
+}
+
+input[type="text"],
+input[type="password"],
+input[type="email"],
+.pf-c-form-control,
+#kc-form-login input {
+  border: 1px solid var(--talus-slate-300) !important;
+  border-radius: 8px !important;
+  background: var(--talus-white) !important;
+  color: var(--talus-slate-900) !important;
+  padding: 0.6rem 0.7rem !important;
+  font-size: 0.95rem !important;
+  box-shadow: none !important;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="email"]:focus,
+.pf-c-form-control:focus,
+#kc-form-login input:focus {
+  outline: none !important;
+  border-color: var(--talus-blue-500) !important;
+  box-shadow: var(--talus-ring) !important;
+}
+
+/* ---- Primary button (Sign in) ---- */
+input[type="submit"],
+button[type="submit"],
+.btn-primary,
+#kc-login {
+  background: var(--talus-blue-700) !important;
+  border: 1px solid var(--talus-blue-700) !important;
+  border-radius: 8px !important;
+  color: var(--talus-white) !important;
+  font-family: var(--talus-font-sans) !important;
+  font-weight: 600 !important;
+  font-size: 0.95rem !important;
+  padding: 0.62rem 1rem !important;
+  text-shadow: none !important;
+  background-image: none !important;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+input[type="submit"]:hover,
+button[type="submit"]:hover,
+.btn-primary:hover,
+#kc-login:hover {
+  background: var(--talus-blue-800) !important;
+  border-color: var(--talus-blue-800) !important;
+}
+input[type="submit"]:focus,
+.btn-primary:focus,
+#kc-login:focus {
+  box-shadow: var(--talus-ring) !important;
+}
+
+/* ---- Links (forgot password, register, back) ---- */
+a, a:visited,
+#kc-registration a,
+#kc-form-options a {
+  color: var(--talus-blue-700) !important;
+}
+a:hover {
+  color: var(--talus-blue-900) !important;
+  text-decoration: underline;
+}
+
+/* ============================================================
+   Identity-provider buttons (the "SSO Users" surface)
+   .kc-social-links / .kc-social-provider-name — one per enabled IdP,
+   ordered by the IdP's guiOrder. Styled as outlined buttons so SSO
+   reads as a clear, equal-weight alternative to the local form.
+   ============================================================ */
+#kc-social-providers {
+  margin-top: 1.25rem;
+}
+#kc-social-providers hr { border-color: var(--talus-slate-200); }
+#kc-social-providers h2,
+#kc-social-providers .kc-social-section-title {
+  color: var(--talus-slate-500) !important;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: center;
+  margin: 0.75rem 0;
+}
+.kc-social-links .kc-social-item,
+.kc-social-links a.zocial,
+#kc-social-providers a {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1.5px solid var(--talus-blue-700) !important;
+  border-radius: 8px !important;
+  background: var(--talus-white) !important;
+  color: var(--talus-blue-700) !important;
+  font-weight: 600 !important;
+  padding: 0.6rem 1rem !important;
+  margin: 0.4rem 0 !important;
+  text-shadow: none !important;
+  background-image: none !important;
+  transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.kc-social-links .kc-social-item:hover,
+.kc-social-links a.zocial:hover,
+#kc-social-providers a:hover {
+  background: var(--talus-blue-50) !important;
+  border-color: var(--talus-blue-800) !important;
+  color: var(--talus-blue-900) !important;
+  text-decoration: none;
+}
+
+/* ---- Alerts / validation ---- */
+.alert-error,
+.pf-c-alert.pf-m-danger,
+.kc-feedback-text {
+  color: var(--talus-danger) !important;
+}
+.alert-error {
+  border-radius: 8px !important;
+  border: 1px solid #f3c6c0 !important;
+  background: #fdf2f0 !important;
+}
+
+/* ---- "Remember me" + checkbox accent ---- */
+input[type="checkbox"] { accent-color: var(--talus-blue-700); }

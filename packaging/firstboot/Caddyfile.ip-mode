@@ -1,0 +1,39 @@
+# Caddyfile.ip-mode — the R6 IP-mode overlay, half 1 (appliance-owned; the release
+# tree ships untouched).
+#
+# Why this file exists: clients send NO SNI when the address is a bare IP (RFC 6066
+# forbids IP literals in server_name), and Caddy selects certificates and sites by
+# SNI — so on https://<ip> the release Caddyfile completes no handshake and serves
+# nothing. fallback_sni substitutes the portal address wherever SNI is absent, which
+# routes no-SNI handshakes to the internal-CA IP cert (issuance itself was proven on
+# a test VM). Everything else — sites, security headers, CSP, the /embed frame split —
+# IS the release Caddyfile, imported verbatim below: no fork, no drift.
+#
+# ★ EXACTNESS TRAP (caddy 2.8, container-verified 2026-08-21): the global fallback_sni
+# option only populates tls_connection_policies, and `caddy adapt` emits NONE when the
+# sites use the empty-default tls directive — the option then validates and silently
+# adapts to NOTHING (auto_https adds its own policy at provision time, AFTER global
+# options are gone). The sites must carry an explicit `tls internal`, so firstboot runs
+# install.sh --edge --tls-internal (TALUS_TLS_DIRECTIVE="tls internal" — the §12.5
+# posture anyway). With it, both servers adapt to policies carrying fallback_sni.
+#
+# Lifecycle: harmless once a real hostname exists (fallback_sni only affects no-SNI
+# clients); `talus-setup` (backlogged, own slice) is the real fix and retires the
+# overlay wholesale.
+# ★ The global options block lives in the release Caddyfile now (one block, first — Caddy's rule), so
+# fallback_sni reaches it through TALUS_CADDY_GLOBAL, which install.sh --edge derives into .env for a
+# bare-IP TALUS_HOSTNAME (and compose passes to Caddy); and the
+# import comes FIRST so that block is first. (2026-10-11: the release block names the internal CA per
+# deployment, which this overlay inherits with no fork.)
+import /etc/caddy/Caddyfile
+
+# ★ Deterministic :80 redirect (VHDX-proof finding, 2026-08-22): the portal (:443) and
+# KC (:8443) sites share ONE bare-IP host, and Caddy's AUTO port-80 redirect picks one
+# of the two targets NON-DETERMINISTICALLY per process start — the OVA/ISO proofs got
+# the portal, the VHDX boot got :8443 (a customer typing the bare IP would land on
+# Keycloak). An explicit http:// site for the name suppresses the auto-redirects for
+# it entirely; 308 matches the auto behavior. Bare-http is the only path affected —
+# the banner and install log both print https://.
+http://{$TALUS_HOSTNAME} {
+	redir https://{$TALUS_HOSTNAME}{uri} 308
+}

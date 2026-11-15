@@ -1,0 +1,29 @@
+# gitleaks config — extends the default ruleset, allowlisting known false positives.
+# Each exception is deliberate; real secrets live in gitignored .env and are still caught.
+[extend]
+useDefault = true
+# `curl-auth-user` flags legitimate `curl -u <placeholder>` examples in docs and verify scripts —
+# documentation/test syntax, never real credentials. High-noise, low-signal for this repo.
+disabledRules = ["curl-auth-user"]
+
+[allowlist]
+description = "Deliberate test fixtures + the gitignored secret store — not committed secrets."
+paths = [
+  # `.env` is the gitignored per-deployment secret file: it holds REAL secrets by design, is never
+  # committed, and only exists in a local working dir (CI's checkout omits it). `--no-git` scans it
+  # anyway, so exclude it explicitly. `.env.example` (placeholders) is still scanned.
+  '''\.env$''',
+]
+regexes = [
+  # The alg:none / unsigned JWT used across the invariant tests to prove the API REJECTS it.
+  '''eyJhbGciOiJub25lIn0\.''',
+  # A build-only literal, not a credential in anything that ships. Narrow by VALUE, not by path,
+  # so a real secret landing in a file still fires.
+  '''bake-only''',
+  # Test fixtures of a secret scrubber's own tests: a realistic-looking JWT and a 40-hex "secret"
+  # planted to prove they are found and redacted. They are the test's subject, not credentials — the
+  # JWT's signature is the jwt.io example's, the hex is a1b2c3… . Narrow by VALUE (the rule
+  # above), so a real secret landing in a file still fires.
+  '''eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9\.eyJzdWIiOiIxMjM0NTY3ODkwIn0\.''',
+  '''a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0''',
+]

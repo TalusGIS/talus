@@ -1,0 +1,544 @@
+# Third-party inventory for the talus-api image — read by `python3 -m third_party_notices`.
+#
+# What package metadata cannot show lives here: the native libraries that Python wheels bundle (auditwheel
+# `*.libs` directories), the copyleft code some wheels link statically, and where the exact source of every
+# copyleft component comes from. The drift check compares the built image against this file and FAILS when:
+#   * a `*.libs` directory holds a library not listed below (a new library is a licence event);
+#   * a copyleft library's bytes changed (its `hashes` no longer match) — its version and source must be
+#     re-traced, then updated here;
+#   * copyleft code is statically linked into a file no [[static]] row covers, or a covered row's version
+#     symbol changed;
+#   * a wheel's licence files newly mention GPL/LGPL wording ([[licence_wording]] is the reviewed set).
+# Permissive libraries are matched by name only: their versions move freely and NOTICES is regenerated.
+#
+# `hashes` are auditwheel's names for the grafted file: lib<name>-<first 8 hex of the ORIGINAL file's
+# sha256>; a library re-grafted by a second wheel carries two. `sha256` pins the file's bytes as shipped, so a
+# re-built copyleft library cannot slip through under the same name or the same version number.
+
+[audited]
+# The architecture whose bytes the hashes below pin: the only one published. On any other architecture the
+# check reports instead of failing, and a release build (TALUS_RELEASE=1) fails.
+arch = "amd64"
+
+# ── Copyleft fingerprints ───────────────────────────────────────────────────────────────────────────────
+# A DEFINED symbol from this list in any shared object outside a `*.libs` directory means that library's
+# code was statically linked into it. Every hit must be covered by a [[static]] row.
+[[fingerprint]]
+symbol = "libiconv_open"
+project = "GNU libiconv"
+[[fingerprint]]
+symbol = "GEOS_init_r"
+project = "GEOS"
+[[fingerprint]]
+symbol = "quadmath_snprintf"
+project = "libquadmath (GCC)"
+[[fingerprint]]
+symbol = "_gfortran_st_write"
+project = "libgfortran (GCC)"
+[[fingerprint]]
+symbol = "keyctl_read"
+project = "keyutils"
+[[fingerprint]]
+symbol = "crypt_r"
+project = "libxcrypt / glibc libcrypt"
+[[fingerprint]]
+symbol = "__gmpz_init"
+project = "GNU MP"
+[[fingerprint]]
+symbol = "mpfr_init"
+project = "GNU MPFR"
+[[fingerprint]]
+symbol = "readline"
+project = "GNU Readline (GPL)"
+[[fingerprint]]
+symbol = "gnutls_global_init"
+project = "GnuTLS"
+[[fingerprint]]
+symbol = "nettle_sha256_init"
+project = "Nettle"
+[[fingerprint]]
+symbol = "gcry_check_version"
+project = "libgcrypt"
+[[fingerprint]]
+symbol = "fribidi_get_bidi_types"
+project = "GNU FriBidi"
+[[fingerprint]]
+symbol = "g_malloc"
+project = "GLib"
+[[fingerprint]]
+symbol = "cairo_create"
+project = "cairo"
+[[fingerprint]]
+symbol = "x264_encoder_open"
+project = "x264 (GPL)"
+[[fingerprint]]
+symbol = "av_malloc"
+project = "FFmpeg"
+[[fingerprint]]
+symbol = "lzo1x_1_compress"
+project = "LZO (GPL)"
+[[fingerprint]]
+symbol = "liq_attr_create"
+project = "libimagequant (GPL-3.0)"
+
+# ── Copyleft native libraries in `*.libs` (version and bytes pinned) ─────────────────────────────────────
+[[native]]
+name = "libgeos"
+project = "GEOS"
+version = "3.14.1"
+license = "LGPL-2.1-or-later"
+license_text = "geos"
+copyleft = true
+libs_dir = "rasterio.libs"
+hashes = ["3ec8fbdb"]
+sha256 = "d98fdaf501b2ec6fdc120ec80760782f14308c18c2afb0b4fc08cc87b3cdeb9b"  # the bytes as shipped (amd64) — an in-place change fails too
+built_by = "rasterio 1.5.2 wheel CI (ci/config.sh), from the upstream tarball, unpatched"
+source = [
+  { url = "https://github.com/libgeos/geos/releases/download/3.14.1/geos-3.14.1.tar.bz2", sha256 = "3c20919cda9a505db07b5216baa980bacdaa0702da715b43f176fb07eff7e716" },
+  { url = "https://github.com/rasterio/rasterio/archive/refs/tags/1.5.2.tar.gz", sha256 = "a3342f6a5102d8bb07d831b2390e217a2fd84afc49efbfe3e7cf36801de99c63", role = "build recipe" },
+]
+
+[[native]]
+name = "libgeos_c"
+project = "GEOS (C API)"
+version = "3.14.1"
+license = "LGPL-2.1-or-later"
+license_text = "geos"
+copyleft = true
+libs_dir = "rasterio.libs"
+hashes = ["0be36666"]
+sha256 = "19868bf21e6ccd92068b1b72f4b3a12472adee5fbb0e6e8c89ddb224acc53460"  # the bytes as shipped (amd64) — an in-place change fails too
+built_by = "rasterio 1.5.2 wheel CI (ci/config.sh), from the upstream tarball, unpatched"
+source = [
+  { url = "https://github.com/libgeos/geos/releases/download/3.14.1/geos-3.14.1.tar.bz2", sha256 = "3c20919cda9a505db07b5216baa980bacdaa0702da715b43f176fb07eff7e716" },
+  { url = "https://github.com/rasterio/rasterio/archive/refs/tags/1.5.2.tar.gz", sha256 = "a3342f6a5102d8bb07d831b2390e217a2fd84afc49efbfe3e7cf36801de99c63", role = "build recipe" },
+]
+
+[[native]]
+name = "libcrypt"
+project = "libxcrypt"
+version = "4.5.2"
+license = "LGPL-2.1-or-later"
+license_text = "libxcrypt"
+copyleft = true
+libs_dir = "psycopg_binary.libs"
+hashes = ["bc2db45e"]
+sha256 = "e2a6f6ff300e287a60dfc0c6fdb76ee01e333068df7c60b4e87453d942ccda65"  # the bytes as shipped (amd64) — an in-place change fails too
+built_by = "the manylinux2014 build image (docker/build_scripts/install-libxcrypt.sh), which rewrites the symbol map at build time for glibc compatibility; grafted into psycopg-binary 3.3.9"
+source = [
+  { url = "https://github.com/besser82/libxcrypt/releases/download/v4.5.2/libxcrypt-4.5.2.tar.xz", sha256 = "71513a31c01a428bccd5367a32fd95f115d6dac50fb5b60c779d5c7942aec071" },
+  { url = "https://github.com/pypa/manylinux/archive/0e1220f35ed8cdfc5c6d53b52618698369ec4916.tar.gz", sha256 = "c43e101a7cfa7514e6a93f4083e0de80dead31b14624222f14ab28d61a9190bb", role = "build recipe" },
+]
+
+[[native]]
+name = "libkeyutils"
+project = "keyutils"
+version = "1.5.8 (CentOS 7 package 1.5.8-3.el7)"
+license = "LGPL-2.1-or-later"
+license_text = "keyutils"
+copyleft = true
+libs_dir = "psycopg_binary.libs"
+hashes = ["dfe70bd6"]
+sha256 = "c29e41b03cf4b2dffbfb4960946e2b42f82c0ca5d53d231d3f0fc597ba274488"  # the bytes as shipped (amd64) — an in-place change fails too
+built_by = "CentOS 7's keyutils-libs package, installed in the manylinux2014 build image; grafted into psycopg-binary 3.3.9"
+source = [
+  { url = "https://vault.centos.org/7.9.2009/os/Source/SPackages/keyutils-1.5.8-3.el7.src.rpm", sha256 = "eff16e16f707fd28436afe4cf7b7c2e34b9f827e7f6beacf3c6eecbf74e9f850" },
+]
+
+[[native]]
+name = "libquadmath"
+project = "libquadmath (GCC)"
+version = "GCC 8.5.0 (AlmaLinux 8 package 8.5.0-28.el8_10.alma.1)"
+license = "LGPL-2.1-or-later"
+license_text = "libquadmath"
+copyleft = true
+libs_dir = "numpy.libs"
+hashes = ["2284e583", "a9307bba"]
+sha256 = "6bc3069003caec1f075be3c51ae8355332f081fa9465910c4b5724e7fe7d8ad4"  # the bytes as shipped (amd64) — an in-place change fails too
+built_by = "AlmaLinux 8's libquadmath package, grafted into scipy-openblas64 0.3.34.106.0, then into the numpy wheel (its version is in section 3)"
+source = [
+  { url = "https://vault.almalinux.org/8.10/BaseOS/Source/Packages/gcc-8.5.0-28.el8_10.alma.1.src.rpm", sha256 = "c94dbbd2cd6d5d01a5a6822ea18f8ce34942c25a80e17b4682d547d5e652dbd0" },
+  { url = "https://github.com/MacPython/openblas-libs/archive/refs/tags/v0.3.34.106.0.tar.gz", sha256 = "7f24a96042d650fdbdec7de83e761d2eb234fdbcd5a0ebac0018850f133770ce", role = "build recipe" },
+]
+
+[[native]]
+name = "libgfortran"
+project = "libgfortran (GCC)"
+version = "GCC 8.5.0 (AlmaLinux 8 package 8.5.0-28.el8_10.alma.1)"
+license = "GPL-3.0-or-later WITH GCC-exception-3.1"
+license_text = "libgfortran"
+copyleft = true
+libs_dir = "numpy.libs"
+hashes = ["83c28eba", "468e71e5"]
+sha256 = "a6a368328d02a5d8a149746f13f6268f8cc9192df5c18777b25c3c9b5ef52160"  # the bytes as shipped (amd64) — an in-place change fails too
+built_by = "AlmaLinux 8's libgfortran package (RPATH rewritten by the scipy-openblas64 build), grafted into scipy-openblas64 0.3.34.106.0, then into the numpy wheel (its version is in section 3)"
+source = [
+  { url = "https://vault.almalinux.org/8.10/BaseOS/Source/Packages/gcc-8.5.0-28.el8_10.alma.1.src.rpm", sha256 = "c94dbbd2cd6d5d01a5a6822ea18f8ce34942c25a80e17b4682d547d5e652dbd0" },
+  { url = "https://github.com/MacPython/openblas-libs/archive/refs/tags/v0.3.34.106.0.tar.gz", sha256 = "7f24a96042d650fdbdec7de83e761d2eb234fdbcd5a0ebac0018850f133770ce", role = "build recipe" },
+]
+
+# ── Permissive native libraries in `*.libs` (name only; NOTICES carries each licence text) ────────────────
+# license_text names a directory under licenses/ (SOURCES.toml records where each file came from), or
+# "dist:<wheel>" when that wheel's own licence files already carry the full text (Pillow's and numpy's do).
+[[native]]
+name = "libscipy_openblas64_"
+project = "OpenBLAS"
+license = "BSD-3-Clause"
+license_text = "dist:numpy"
+[[native]]
+name = "libXau"
+project = "libXau (X.Org)"
+license = "MIT-open-group"
+license_text = "libxau"
+[[native]]
+name = "libxcb"
+project = "libxcb (X.Org)"
+license = "X11"
+license_text = "libxcb"
+[[native]]
+name = "libavif"
+project = "libavif (with its statically linked AV1 codecs)"
+license = "BSD-2-Clause"
+license_text = "dist:pillow"
+[[native]]
+name = "libbrotlicommon"
+project = "Brotli"
+license = "MIT"
+license_text = "dist:pillow"
+[[native]]
+name = "libbrotlidec"
+project = "Brotli"
+license = "MIT"
+license_text = "dist:pillow"
+[[native]]
+name = "libfreetype"
+project = "FreeType"
+license = "FTL OR GPL-2.0-or-later (FTL elected)"
+license_text = "dist:pillow"
+[[native]]
+name = "libharfbuzz"
+project = "HarfBuzz"
+license = "MIT-Modern-Variant"
+license_text = "dist:pillow"
+[[native]]
+name = "libjpeg"
+project = "libjpeg-turbo"
+license = "IJG AND BSD-3-Clause AND Zlib"
+license_text = "libjpeg-turbo"
+[[native]]
+name = "liblcms2"
+project = "Little CMS"
+license = "MIT"
+license_text = "dist:pillow"
+[[native]]
+name = "liblzma"
+project = "XZ Utils (liblzma)"
+license = "0BSD"
+license_text = "xz"
+[[native]]
+name = "libopenjp2"
+project = "OpenJPEG"
+license = "BSD-2-Clause"
+license_text = "openjpeg"
+[[native]]
+name = "libpng16"
+project = "libpng"
+license = "libpng-2.0"
+license_text = "libpng"
+[[native]]
+name = "libsharpyuv"
+project = "libwebp (sharpyuv)"
+license = "BSD-3-Clause"
+license_text = "libwebp"
+[[native]]
+name = "libtiff"
+project = "LibTIFF"
+license = "libtiff"
+license_text = "libtiff"
+[[native]]
+name = "libwebp"
+project = "libwebp"
+license = "BSD-3-Clause"
+license_text = "libwebp"
+[[native]]
+name = "libwebpdemux"
+project = "libwebp"
+license = "BSD-3-Clause"
+license_text = "libwebp"
+[[native]]
+name = "libwebpmux"
+project = "libwebp"
+license = "BSD-3-Clause"
+license_text = "libwebp"
+[[native]]
+name = "libzstd"
+project = "Zstandard"
+license = "BSD-3-Clause OR GPL-2.0-only (BSD-3-Clause elected)"
+license_text = "zstd"
+[[native]]
+name = "libcom_err"
+project = "com_err (e2fsprogs)"
+license = "LicenseRef-com_err (MIT-style, per e2fsprogs COPYING)"
+license_text = "com_err"
+[[native]]
+name = "libcrypto"
+project = "OpenSSL"
+license = "Apache-2.0"
+license_text = "openssl"
+[[native]]
+name = "libssl"
+project = "OpenSSL"
+license = "Apache-2.0"
+license_text = "openssl"
+[[native]]
+name = "libgssapi_krb5"
+project = "MIT Kerberos"
+license = "LicenseRef-krb5 (MIT/BSD-style)"
+license_text = "krb5"
+[[native]]
+name = "libk5crypto"
+project = "MIT Kerberos"
+license = "LicenseRef-krb5 (MIT/BSD-style)"
+license_text = "krb5"
+[[native]]
+name = "libkrb5"
+project = "MIT Kerberos"
+license = "LicenseRef-krb5 (MIT/BSD-style)"
+license_text = "krb5"
+[[native]]
+name = "libkrb5support"
+project = "MIT Kerberos"
+license = "LicenseRef-krb5 (MIT/BSD-style)"
+license_text = "krb5"
+[[native]]
+name = "liblber"
+project = "OpenLDAP"
+license = "OLDAP-2.8"
+license_text = "openldap"
+[[native]]
+name = "libldap"
+project = "OpenLDAP"
+license = "OLDAP-2.8"
+license_text = "openldap"
+[[native]]
+name = "libpq"
+project = "PostgreSQL (libpq)"
+license = "PostgreSQL"
+license_text = "postgresql"
+[[native]]
+name = "libsasl2"
+project = "Cyrus SASL"
+license = "LicenseRef-cyrus-sasl (BSD-style with acknowledgment)"
+license_text = "cyrus-sasl"
+[[native]]
+name = "libcurl"
+project = "curl"
+license = "curl"
+license_text = "curl"
+[[native]]
+name = "libnghttp2"
+project = "nghttp2"
+license = "MIT"
+license_text = "nghttp2"
+[[native]]
+name = "libproj"
+project = "PROJ"
+license = "MIT"
+license_text = "proj"
+[[native]]
+name = "libsqlite3"
+project = "SQLite"
+license = "blessing"
+license_text = "sqlite"
+[[native]]
+name = "libLerc"
+project = "LERC (Esri)"
+license = "Apache-2.0"
+license_text = "lerc"
+[[native]]
+name = "libaec"
+project = "libaec"
+license = "BSD-2-Clause"
+license_text = "libaec"
+[[native]]
+name = "libsz"
+project = "libaec (szip compatibility)"
+license = "BSD-2-Clause"
+license_text = "libaec"
+[[native]]
+name = "libblosc"
+project = "Blosc"
+license = "BSD-3-Clause"
+license_text = "blosc"
+[[native]]
+name = "libdeflate"
+project = "libdeflate"
+license = "MIT"
+license_text = "libdeflate"
+[[native]]
+name = "libgdal"
+project = "GDAL"
+license = "MIT"
+license_text = "gdal"
+[[native]]
+name = "libgif"
+project = "GIFLIB"
+license = "MIT"
+license_text = "giflib"
+[[native]]
+name = "libhdf5"
+project = "HDF5"
+license = "LicenseRef-hdf5 (BSD-style)"
+license_text = "hdf5"
+[[native]]
+name = "libhdf5_hl"
+project = "HDF5 (high-level)"
+license = "LicenseRef-hdf5 (BSD-style)"
+license_text = "hdf5"
+[[native]]
+name = "libjson-c"
+project = "json-c"
+license = "MIT"
+license_text = "json-c"
+[[native]]
+name = "libnetcdf"
+project = "netCDF-C"
+license = "BSD-3-Clause"
+license_text = "netcdf-c"
+[[native]]
+name = "libpcre2-8"
+project = "PCRE2"
+license = "BSD-3-Clause WITH PCRE2-exception"
+license_text = "pcre2"
+
+# ── Copyleft code statically linked into a wheel's own extension modules ────────────────────────────────
+[[static]]
+files = "lxml/*.so"
+fingerprint = "libiconv_open"
+project = "GNU libiconv"
+version = "1.18"
+version_symbol = "_libiconv_version"
+version_value = 0x0112
+# The bytes of every file the code is linked into, as shipped (amd64). A rebuilt lxml — even at the same
+# libiconv version — is a new binary carrying LGPL code: re-trace it, then update these.
+file_sha256 = { "lxml/etree.cpython-312-x86_64-linux-gnu.so" = "857d4774abd3ac4382f2de2e0e8e38d4e5bdbd18afb88781b6405cefee6fa02a", "lxml/objectify.cpython-312-x86_64-linux-gnu.so" = "e0bbc24c44024d06c001a5e399143ebac39c5218da976c5a2d8a0b4ea14cb569" }
+license = "LGPL-2.1-or-later"
+license_text = "libiconv"
+built_by = "lxml 6.1.3's wheel build (buildlibxml.py, STATIC_DEPS=true, tag lxml-6.1.3-1), from the upstream tarball, unpatched"
+source = [
+  { url = "https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.18.tar.gz", sha256 = "3b08f5f4f9b4eb82f151a7040bfd6fe6c6fb922efe4b1659c66ea933276965e8" },
+  { pypi_sdist = "lxml==6.1.3", url = "https://pypi.org/project/lxml/6.1.3/#files", role = "the program it is linked into" },
+  { url = "https://github.com/lxml/lxml/archive/f9e4999ef79e1caa369f84cece0bdaf19a1ef550.tar.gz", sha256 = "65bf6c2a8e1ada016d13f7f2f78cc4b614647a83b7c8508374f79945c556d82a", role = "build recipe" },
+]
+
+# ── Where a copyleft Python package's source comes from, when it is not simply its own sdist on PyPI ───────
+# psycopg-binary publishes wheels only: it is built from psycopg's C implementation (the psycopg-c sdist) by
+# psycopg's own tooling, at the commit its release wheels were built from (for 3.3.9 the commit the tag points
+# to: upstream's "Build binary packages" run of 2026-11-12 ran on it). Version-matched: a different
+# psycopg-binary fails nothing here, but its
+# NOTICES source line would then be wrong — so the row names the version it describes and is ignored otherwise.
+[[python_source]]
+name = "psycopg-binary"
+version = "3.3.9"
+source = [
+  { pypi_sdist = "psycopg-c==3.3.9", url = "https://pypi.org/project/psycopg-c/3.3.9/#files", role = "the C source the wheel is built from" },
+  { url = "https://github.com/psycopg/psycopg/archive/bced8a8993064a378d5ca852215d99f73f4c6cae.tar.gz", sha256 = "4f2d829269920e7f55697b89d460adfdab8515e694769b29abd0430353b7fb4c", role = "build recipe (tools/ci) at the commit the release wheels were built from" },
+]
+
+# Permissive code statically linked into wheels — listed in NOTICES; not drift-checked.
+[[embedded]]
+dist = "lxml"
+project = "libxml2"
+license = "MIT"
+license_text = "libxml2"
+[[embedded]]
+dist = "lxml"
+project = "libxslt / libexslt"
+license = "MIT"
+license_text = "libxslt"
+[[embedded]]
+dist = "lxml"
+project = "zlib"
+license = "Zlib"
+license_text = "zlib"
+
+# ── GPL/LGPL wording in wheels' own licence files — reviewed; a new one fails the check ─────────────────
+[[licence_wording]]
+dist = "lxml"
+file = "licenses/LICENSES.txt"
+reason = "GNU libiconv (LGPL) is statically linked — the [[static]] row; the GPL test runner it names is not in the wheel"
+[[licence_wording]]
+dist = "numpy"
+file = "licenses/LICENSE.txt"
+reason = "libgfortran (GPL-3.0+ with the GCC Runtime Library Exception) and libquadmath (LGPL-2.1+) — [[native]] rows"
+[[licence_wording]]
+dist = "pillow"
+file = "licenses/LICENSE"
+reason = "FreeType's dual licence (FTL elected) and XZ Utils' notes on tools and build files that are not in the wheel"
+[[licence_wording]]
+dist = "psycopg"
+file = "licenses/LICENSE.txt"
+reason = "the LGPL-3.0 text itself — a named exception in licensing.py"
+[[licence_wording]]
+dist = "psycopg-binary"
+file = "licenses/LICENSE.txt"
+reason = "the LGPL-3.0 text itself — a named exception in licensing.py"
+[[licence_wording]]
+dist = "psycopg-pool"
+file = "licenses/LICENSE.txt"
+reason = "the LGPL-3.0 text itself — a named exception in licensing.py"
+[[licence_wording]]
+dist = "pyarrow"
+file = "licenses/LICENSE.txt"
+reason = "a GPLv2 compatibility clause in a permissively licensed bundled component; nothing GPL is bundled"
+[[licence_wording]]
+dist = "typing-extensions"
+file = "licenses/LICENSE"
+reason = "the PSF licence's history table (GPL compatibility of past Python releases)"
+
+# ── Software the api Dockerfile adds outside Python and Debian ──────────────────────────────────────────
+# Every ELF executable in /usr/local/bin must be listed here (an unlisted one fails the check). license_text
+# "image:<path>" means the text ships in the image at that path.
+[[binary]]
+path = "/usr/local/bin/python3.12"
+project = "CPython (the image's Python interpreter)"
+license = "PSF-2.0"
+license_text = "image:/usr/local/lib/python3.12/LICENSE.txt"
+[[binary]]
+path = "/usr/local/bin/pmtiles"
+project = "go-pmtiles"
+version = "v1.31.2"
+license = "BSD-3-Clause"
+license_text = "go-pmtiles"
+# The Go modules compiled in: licenses/go-modules/ (MODULES.toml). The check fails when the binary's build
+# info lists a different set — re-fetch their licence texts for the new version.
+go_modules = "go-modules"
+[[binary]]
+path = "/usr/local/bin/typst"
+project = "Typst"
+version = "v0.15.1"
+license = "Apache-2.0"
+license_text = "image:/usr/share/doc/talus-third-party/typst"
+# The crates compiled in: licenses/typst-crates/ (CRATES.toml, from Typst's Cargo.lock at the tag). A Rust
+# binary does not record its crates, so the bytes are pinned instead: a new Typst fails the check until its
+# crates' licence texts are re-fetched.
+rust_crates = "typst-crates"
+sha256 = "29273eaa04f6d00edd0c2bec578f565fc9c65be856bfbffc894567c68ed0b237"
+
+[[asset]]
+path = "/usr/share/talus-fonts"
+project = "Liberation Sans 2.1.5 (report fonts)"
+license = "OFL-1.1"
+license_text = "image:/usr/share/doc/talus-third-party/liberation-fonts"
+
+# The EPSG Geodetic Parameter Dataset, inside the PROJ library's reference database. pyproj and rasterio each
+# carry a copy (proj.db; the second is at site-packages/rasterio/proj_data/proj.db), and the Dockerfile marks
+# three of its records deprecated in both (datum_grids/withdraw_nad83_shifts.py). The dataset's terms of use ask
+# that IOGP's ownership be acknowledged wherever it is passed on, changed copies included, and that recipients
+# be told of the terms: licenses/epsg-dataset says both, and names the changed records. The release's own
+# NOTICES says the same of db/proj/proj.db.
+[[asset]]
+path = "/usr/local/lib/python3.12/site-packages/pyproj/proj_dir/share/proj/proj.db"
+project = "EPSG Geodetic Parameter Dataset"
+license = "EPSG terms of use"
+license_text = "epsg-dataset"

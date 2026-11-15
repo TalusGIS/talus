@@ -1,0 +1,244 @@
+# Talus GIS — reference reverse proxy (Talus 32, web-edge hardening).
+#
+# The hardened TLS front for a turnkey deployment, brought up via the compose
+# `edge` profile:  docker compose --profile edge up
+# Caddy serves the built SPA (web/dist) and reverse-proxies the api under ONE TLS
+# origin (same-origin -> no CORS), and fronts Keycloak on a sibling hostname. It
+# terminates TLS (Caddy's default minimum is TLS 1.2), automates ACME/Let's-Encrypt
+# issuance + renewal for public hostnames, and uses its INTERNAL CA automatically
+# for *.localhost / non-public names (so this file also works for local testing).
+# It emits the security-header baseline INCLUDING HSTS (HSTS lives only here, on a
+# TLS origin -- never in the app).
+#
+# PREREQUISITE: build the SPA first ->  npm --prefix web run build  (produces web/dist).
+#
+# Operator config (see .env.example):
+#   TALUS_HOSTNAME     public host for the portal + api  (e.g. gis.example.org)
+#   KEYCLOAK_HOSTNAME  public host for Keycloak / OIDC    (e.g. auth.example.org)
+#
+# Auto-TLS works WITHOUT an ACME contact email. To also receive Let's-Encrypt
+# certificate-expiry notices, add a global options block with your address:
+#   {
+#       email you@example.org
+#   }
+#
+# Fronting Keycloak over TLS additionally requires, on the keycloak service:
+#   KC_PROXY_HEADERS=xforwarded   and   KC_HOSTNAME=https://${KEYCLOAK_HOSTNAME}
+# plus pointing KEYCLOAK_ISSUER (and the SPA OIDC config) at the public auth URL.
+# These are NOT wired into the dev defaults (the localhost OIDC flow must stay
+# intact); the installer (scripts/talus-setup.sh, which runs install.sh --edge) does the
+# production switch-over.
+
+# Global options — the ONE such block Caddy allows, and it must come first; Caddyfile.ip-mode imports
+# this file FIRST for exactly that reason, and hands its one extra option (fallback_sni) in through
+# TALUS_CADDY_GLOBAL, the way TALUS_TLS_DIRECTIVE already hands the sites their issuer.
+{
+	{$TALUS_CADDY_GLOBAL}
+	# The largest request line plus headers the edge accepts. Caddy 2.11.6 lowered its default from
+	# 1 MB to 16 KiB (431 above it), which would refuse a long GET the api takes today: an Esri-style
+	# query carrying a long `where` or a long list of object ids. The api itself stops between 64 and
+	# 100 KiB, so 128 KiB keeps what worked working and still bounds what the edge will buffer.
+	servers {
+		max_header_size 128KiB
+	}
+	# The internal CA is named for THIS deployment: every Talus box used to mint
+	# an identical "Caddy Local Authority - <year> ECC Root", and a phone that held two could not tell them
+	# apart — full trust was switched on for the wrong one. The name is baked when the CA is first created
+	# (a box that already has one keeps its old name until its Caddy data is wiped). Trust is by key, not
+	# name: this changes what a person reads under Certificate Trust Settings, nothing about validation.
+	pki {
+		ca local {
+			name "Talus GIS ({$TALUS_HOSTNAME})"
+		}
+	}
+	# The edge's ERROR-level log, as a rolled file the api reads for the Helper's diagnostics
+	# (decision-ai-substrate.md §13, item 6: errors only). This is Caddy's
+	# default (runtime/error) logger; NO site declares an access log, so a visitor's address and path
+	# are written only when a request failed at the edge. 0644: the api runs as another uid.
+	log {
+		output file /servicelogs/caddy/caddy.log {
+			roll_size 10MiB
+			roll_keep 3
+			mode 0644
+		}
+		format json
+		level ERROR
+	}
+}
+
+{$TALUS_HOSTNAME} {
+	# TLS issuer, operator-selected (B5 edge finding, 2026-08-07). EMPTY (the default) =
+	# Caddy's automatic behavior: ACME for public names, internal CA for *.localhost.
+	# Set TALUS_TLS_DIRECTIVE="tls internal" for a LAN / air-gapped deployment whose
+	# hostname LOOKS public (e.g. nip.io, or a real domain with no inbound reachability):
+	# ACME cannot validate without inbound internet, and Caddy would otherwise retry
+	# forever while serving nothing. install.sh --edge --tls-internal sets this.
+	{$TALUS_TLS_DIRECTIVE}
+
+	encode zstd gzip
+
+	# Security headers on every response for this site. HSTS lives ONLY here.
+	# No `preload` -- that commitment is hard to reverse; operators opt in deliberately.
+	#
+	# ★ `-Server` lives in its OWN directive, NOT in the block (decision-map-embed.md review
+	# finding, container-verified on caddy:2.8): a header block containing ANY delete op is
+	# DEFERRED to response-write time, where handlers run inside-out — a deferred global block
+	# would re-add X-Frame-Options AFTER the @embed handle's `-X-Frame-Options` delete, silently
+	# defeating the /embed/* frame-policy split below. Keeping the set-ops in an all-set block
+	# applies them in the request phase, so the @embed delete (deferred, innermost) wins there.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+	header -Server
+
+	# 9a: deployment runtime config — install.sh --edge writes proxy/config/config.json
+	# from .env, so ONE built SPA dist serves every hostname (the appliance's one-image
+	# model). no-store: an origin change takes effect on the next reload, never a stale
+	# cached copy. Ordered FIRST so neither the SPA fallback nor /embed/* shadows it.
+	@runtimecfg path /config.json
+	handle @runtimecfg {
+		root * /srv/config
+		header Cache-Control "no-store"
+		file_server
+	}
+
+	# api + liveness -> FastAPI (it sets its own strict CSP on JSON responses).
+	@api path /api/* /health
+	handle @api {
+		reverse_proxy api:8000
+	}
+
+	# /embed/* -- the FRAMEABLE public-map viewer (decision-map-embed.md F1). Same SPA bundle,
+	# DIFFERENT frame policy, on THIS PATH ONLY: X-Frame-Options removed and `frame-ancestors *`
+	# so a city site can iframe a public map. Everything else about the CSP stays as strict as
+	# the main SPA block below. The authed app keeps DENY + 'none' -- NEVER relax globally: the
+	# embed route renders no login and no authed surface, so framing it exposes nothing to
+	# clickjack; the data gate stays the API's public-map 404.
+	@embed path /embed/*
+	handle @embed {
+		root * /srv/www
+		header {
+			-X-Frame-Options
+			Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; worker-src 'self' blob:; connect-src 'self' https:; font-src 'self' data:; frame-ancestors *; base-uri 'self'; form-action 'self'; object-src 'none'"
+		}
+		try_files {path} /index.html
+		file_server
+	}
+
+	# /field/* -- the Talus+ field app, when its dist is installed (a SECOND build target under
+	# /srv/www/field with its own manifest + service-worker scope; decision-talus-field-f1.md §4).
+	# Its client-side routes must fall back to /field/index.html, NOT the portal shell, so this
+	# handle sits BEFORE the catch-all below. Same origin, same CSP as the portal. On a deployment
+	# without that dist there is no /srv/www/field and every /field/* request is a plain 404 --
+	# the portal is untouched.
+	@field path /field /field/*
+	handle @field {
+		root * /srv/www
+		header Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; worker-src 'self' blob:; connect-src 'self' https:; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+		try_files {path} /field/index.html
+		file_server
+	}
+
+	# Everything else -> the built SPA (client-side routing falls back to index.html).
+	handle {
+		root * /srv/www
+
+		# MapLibre-tuned CSP -- ENFORCING (the T32 F3 fast-follow, decision-csp-enforce.md).
+		# Validated 2026-07-14 against the current app; the browser now BLOCKS violations.
+		# The teeth are in `script-src 'self' 'wasm-unsafe-eval'`: WASM (MapLibre/pmtiles) is
+		# allowed, but NO inline script and NO cross-origin script -- so an injected
+		# <script> is a non-event. `object-src 'none'` + `base-uri 'self'` close the classics.
+		#
+		# `connect-src` / `img-src` use `https:` (any HTTPS host), NOT a pinned list, ON PURPOSE.
+		# The SPA connects/fetches cross-origin to THREE unbounded classes of host, none of them
+		# fixed at build time (decision-csp-enforce.md §3):
+		#   - Keycloak (a SIBLING origin) -- oidc-client-ts fetches OIDC discovery/JWKS + the
+		#     token endpoint + silent-renew. A pinned connect-src BREAKS LOGIN.
+		#   - External "Add-from-URL" layers -- county/state ArcGIS, GeoJSON, XYZ tiles fetched
+		#     DIRECTLY from whatever host the author pasted (the no-SSRF design, 2026-07-04).
+		#   - USGS imagery (basemap.nationalmap.gov) -- the one gated external basemap raster.
+		#     (Basemap glyphs/sprites are VENDORED same-origin since the basemap-provisioning
+		#     slice; the vector archive serves from the api. protomaps.github.io is no longer dialed.)
+		# `https:` still blocks http:, and scripts stay same-origin-only. Air-gapped deployments
+		# self-host all of the above and MAY tighten `connect-src`/`img-src` to their own origins.
+		# `font-src 'self' data:` -- most DS woff2 subsets are bundled same-origin, but the Vite
+		# build inlines one small subset as a `data:` URI. The pre-paint theme script is EXTERNAL
+		# (`/theme-init.js`, covered by 'self') so script-src needs no 'unsafe-inline'/hash.
+		header Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; worker-src 'self' blob:; connect-src 'self' https:; font-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+# Keycloak / OIDC on a sibling hostname (see the header note re: KC_ env requirements).
+{$KEYCLOAK_HOSTNAME} {
+	{$TALUS_TLS_DIRECTIVE}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+
+	# The root of the sign-in address goes to the portal (a first-touch finding).
+	# Keycloak answers "/" with a redirect to ITS OWN admin console — a different system with a
+	# different administrator — and the install summary tells a person to open this address once
+	# (to accept its certificate), so the first thing they met was a login form that refused the
+	# Talus admin. Only the bare root is redirected: /realms/*, /resources/* and /admin/ are as
+	# they were. PORTAL_ORIGIN is install.sh's (hostname or IP mode, port suffix included);
+	# compose defaults it from TALUS_HOSTNAME for a hand-run stack.
+	@root path /
+	redir @root {$PORTAL_ORIGIN}/ 302
+
+	# The sign-in server's OWN administration — its admin console, admin API and `master` realm —
+	# answered only to the addresses in KEYCLOAK_ADMIN_ALLOW_FROM; everyone else gets 404.
+	#
+	# OFF BY DEFAULT: the default list is every address, so this block refuses nobody until an
+	# operator sets the value. (A restriction on by default is a barrier
+	# for an internet-facing server's administrator, who needs that console to connect an identity
+	# provider, and it closes no way in — the account behind it has a 192-bit generated password.)
+	# Turning it on is what Keycloak's own reverse-proxy guide recommends for these two paths.
+	# In .env, a space-separated list of addresses or CIDR ranges:
+	#     KEYCLOAK_ADMIN_ALLOW_FROM="203.0.113.7 198.51.100.0/24"   (in double quotes: .env is also read by the shell)
+	# Then: docker compose up -d caddy
+	# On an internet-facing server list the exact public IPv4 addresses and do NOT add
+	# `private_ranges`: Docker's own bridge is a private address, and a caller who arrives over IPv6
+	# (or through anything forwarded on the host) reaches this server FROM that bridge — so
+	# "private" would admit them. Listed exactly, such a caller is simply not on the list.
+	#
+	# Nothing of Talus's own passes through here: the installer and every maintenance script reach
+	# Keycloak at localhost:8080 on the host, and the api at keycloak:8080 inside the network. Sign-in,
+	# tokens and single sign-on use /realms/<the portal's realm>/ and are never matched.
+	# `remote_ip` is the address that connected to THIS server: behind another proxy every caller
+	# has that proxy's address, so restrict there instead.
+	#
+	# `*;*` — ANY path containing a semicolon is refused with these. Keycloak drops a "matrix
+	# parameter" from each path segment before it routes, so `/realms/master;x/…` and
+	# `/admin;x/realms/…` ARE the master realm and the admin API to Keycloak while matching neither
+	# pattern here (measured on Keycloak 26.0.8, the version then pinned: `/realms/master;x/.well-known/openid-configuration`
+	# answers 200; found by the independent review of this rule). No sign-in address has a
+	# semicolon in its path. The matcher reads the path decoded, so `%3B` is covered too.
+	@kc_admin {
+		path /admin /admin/* /realms/master /realms/master/* *;*
+		not remote_ip {$KEYCLOAK_ADMIN_ALLOW_FROM:0.0.0.0/0 ::/0}
+	}
+	respond @kc_admin 404
+	# The `path` matcher above reads the path DECODED and CLEANED, while the request is passed on
+	# as it arrived. So `/realms/x%2F../../master/…` reads here as `/master/…` (refused by nothing)
+	# and could reach Keycloak raw, where a different reading of `%2F` and `..` points elsewhere
+	# (once-over 2026-11-15 E1: Keycloak 26.8.2 answered 400 to every such spelling tried, so this
+	# is defence in depth). With the restriction on, a caller not on the list is also refused any
+	# request whose RAW path, before `?`, holds an encoded slash or backslash or a `.`/`..` segment.
+	# No sign-in address has one; sign-in's encoded redirect address is in the query, never read here.
+	@kc_odd_path {
+		expression `{http.request.orig_uri}.matches("^[^?]*(%2[fF]|%5[cC]|/\\.\\.?(/|\\?|$))")`
+		not remote_ip {$KEYCLOAK_ADMIN_ALLOW_FROM:0.0.0.0/0 ::/0}
+	}
+	respond @kc_odd_path 404
+
+	reverse_proxy keycloak:8080
+}

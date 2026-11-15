@@ -1,0 +1,4 @@
+# db/proj/proj.db — derived by scripts/derive-proj-db.sh; do not edit by hand.
+# image:           postgis/postgis@sha256:843518fb0afec6a685a700fa6df3ab02a7e433781cf74631b63fc690967087e4
+# image's own:     3d3d8b279d100544b5737cd08a732335170fff09ee91166b4137919d6d019198
+f5d48924766e92f03687527c8fbdd3116b16ec4dab9104973714d67c8f21c73b  proj.db

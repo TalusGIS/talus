@@ -1,0 +1,242 @@
+# Where every licence text in this directory came from: the exact URL fetched and the sha256 of what it returned.
+# Each text is taken from the project's own repository at the version the bundling wheel was built with.
+
+["blosc"]
+files = [
+  { file = "LICENSE.txt", url = "https://raw.githubusercontent.com/Blosc/c-blosc/v1.21.6/LICENSE.txt", sha256_of_download = "22623131a9b9f6a86a4dc6b9bccbb1d2aeb390df86bca00fc727af24735c2fae" },
+  { file = "LICENSES-BITSHUFFLE.txt", url = "https://raw.githubusercontent.com/Blosc/c-blosc/v1.21.6/LICENSES/BITSHUFFLE.txt", sha256_of_download = "ef357c2061cf67db298f9f1565572ee229ad9263582a9f9d0ebff5094f5d10ac" },
+  { file = "LICENSES-FASTLZ.txt", url = "https://raw.githubusercontent.com/Blosc/c-blosc/v1.21.6/LICENSES/FASTLZ.txt", sha256_of_download = "cf52909e6ed770fe81511ba62d4ebee13185d30a37d0fd7de2b56685e288ab38" },
+  { file = "LICENSES-LZ4.txt", url = "https://raw.githubusercontent.com/Blosc/c-blosc/v1.21.6/LICENSES/LZ4.txt", sha256_of_download = "fe6dc1f27f68d9dd6b0192e39be1a8f1fbed0fe86e13540f618a7133971b10b3" },
+  { file = "LICENSES-SNAPPY.txt", url = "https://raw.githubusercontent.com/Blosc/c-blosc/v1.21.6/LICENSES/SNAPPY.txt", sha256_of_download = "5221a36a801b981fbdfda7b87db64cff231a3b88223a066c325411b539df796f" },
+  { file = "LICENSES-STDINT.txt", url = "https://raw.githubusercontent.com/Blosc/c-blosc/v1.21.6/LICENSES/STDINT.txt", sha256_of_download = "f2af03db562e88539f019b1ab0881878ee82d0c80f3bce68c650064652e25d7b" },
+  { file = "LICENSES-ZLIB-NG.txt", url = "https://raw.githubusercontent.com/Blosc/c-blosc/v1.21.6/LICENSES/ZLIB-NG.txt", sha256_of_download = "f8ad3757bc2ae9f5a6af77e13b37a5721397421ce55ab16e1da49e4629264d2c" },
+  { file = "LICENSES-ZLIB.txt", url = "https://raw.githubusercontent.com/Blosc/c-blosc/v1.21.6/LICENSES/ZLIB.txt", sha256_of_download = "845efc77857d485d91fb3e0b884aaa929368c717ae8186b66fe1ed2495753243" },
+]
+
+["com_err"]
+files = [
+  { file = "COPYING-statement.txt", url = "https://raw.githubusercontent.com/tytso/e2fsprogs/v1.42.9/COPYING", sha256_of_download = "680f852df303874fe9c722283a7da571ae9a0477768df8af1e363298e2adc51e", excerpt = "text before: GNU GENERAL PUBLIC LICENSE" },
+  { file = "COPYRIGHT-NOTICE.txt", url = "https://raw.githubusercontent.com/tytso/e2fsprogs/v1.42.9/lib/et/com_err.c", sha256_of_download = "873d31d80fa2f930d13b3fb600159663d54861af0abb937c1b879b74e11db0ab", excerpt = "leading comment block" },
+]
+
+["curl"]
+files = [
+  { file = "COPYING", url = "https://raw.githubusercontent.com/curl/curl/curl-8_20_0/COPYING", sha256_of_download = "82f2f4427d6545ee5aaac4f0b80428da6cc8ba41c2cf5da3a03680ec327b9681" },
+]
+
+["cyrus-sasl"]
+files = [
+  { file = "COPYING", url = "https://raw.githubusercontent.com/cyrusimap/cyrus-sasl/cyrus-sasl-2.1.26/COPYING", sha256_of_download = "9d6e5d1632140a6c135b251260953650d17d87cd1124f87aaf72192aa4580d4b" },
+]
+
+["gdal"]
+files = [
+  { file = "LICENSE.TXT", url = "https://raw.githubusercontent.com/OSGeo/gdal/v3.12.2/LICENSE.TXT", sha256_of_download = "1dae3468e81d00da56e2936f74d33b8b3ad09d726437f19ce209a5dabea41f77" },
+]
+
+["geos"]
+files = [
+  { file = "COPYING", url = "https://raw.githubusercontent.com/libgeos/geos/3.14.1/COPYING", sha256_of_download = "dc626520dcd53a22f727af3ee42c770e56c97a64fe3adb063799d8ab032fe551" },
+]
+
+["giflib"]
+files = [
+  { file = "COPYING", url = "https://sourceforge.net/p/giflib/code/ci/5.2.2/tree/COPYING?format=raw", sha256_of_download = "0c9b7990ecdca88b676db232c226548ac408b279f550d424d996f0d83591dd8e" },
+]
+
+["go-pmtiles"]
+files = [
+  { file = "LICENSE", url = "https://raw.githubusercontent.com/protomaps/go-pmtiles/v1.31.2/LICENSE", sha256_of_download = "9500fb7d824af20acfb30e32e8350d98ba60525610a91008e91fd83e16da7bb5" },
+]
+
+["hdf5"]
+files = [
+  { file = "LICENSE", url = "https://raw.githubusercontent.com/HDFGroup/hdf5/2.2.0/LICENSE", sha256_of_download = "b384492d25c6e4a49f371b646d9a81bc0a4b97cf0c66c2f3ed1b35f78a148732" },
+]
+
+["json-c"]
+files = [
+  { file = "COPYING", url = "https://raw.githubusercontent.com/json-c/json-c/json-c-0.18-20240915/COPYING", sha256_of_download = "74c1e6ca5eba76b54d0ad00d4815c8315c1b3bc45ff99de61d103dc92486284c" },
+]
+
+["keyutils"]
+files = [
+  { file = "LICENCE.LGPL", url = "https://git.kernel.org/pub/scm/linux/kernel/git/dhowells/keyutils.git/plain/LICENCE.LGPL?h=v1.5.8", sha256_of_download = "0d15593e3a8ad90917f8509b5ac1e4b5e5d196434a68029aa9dc0858a4a4c521" },
+  { file = "COPYRIGHT-NOTICE.txt", url = "https://git.kernel.org/pub/scm/linux/kernel/git/dhowells/keyutils.git/plain/keyutils.c?h=v1.5.8", sha256_of_download = "4c34f646e28308cb4b47c9f871f0686da9cbcc59ab289c35ee13e049c2d711bf", excerpt = "leading comment block" },
+]
+
+["krb5"]
+files = [
+  { file = "NOTICE", url = "https://raw.githubusercontent.com/krb5/krb5/krb5-1.15.1-final/NOTICE", sha256_of_download = "f83512c49bc8cbc44ca6b8783e989a03b4051508b30563b3f9d7956eefae9151" },
+]
+
+["lerc"]
+files = [
+  { file = "LICENSE", url = "https://raw.githubusercontent.com/Esri/lerc/v4.0.0/LICENSE", sha256_of_download = "77a8b761727c75e2167b15bfdf61b2c0bcf8792271228bebe80779106ad00671" },
+]
+
+["libaec"]
+files = [
+  { file = "LICENSE.txt", url = "https://raw.githubusercontent.com/MathisRosenhauer/libaec/v1.1.7/LICENSE.txt", sha256_of_download = "9fdabba96fbc46af0ca018f86329f1e06e873b25801732001128d5afca265e36" },
+]
+
+["libdeflate"]
+files = [
+  { file = "COPYING", url = "https://raw.githubusercontent.com/ebiggers/libdeflate/v1.24/COPYING", sha256_of_download = "4ad69099cb4374836fd27583d9991e2838cd86b6e4666ab26b2d32582c91e73a" },
+]
+
+["libgfortran"]
+files = [
+  { file = "COPYING3", url = "https://raw.githubusercontent.com/gcc-mirror/gcc/releases/gcc-8.5.0/COPYING3", sha256_of_download = "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903" },
+  { file = "COPYING.RUNTIME", url = "https://raw.githubusercontent.com/gcc-mirror/gcc/releases/gcc-8.5.0/COPYING.RUNTIME", sha256_of_download = "9d6b43ce4d8de0c878bf16b54d8e7a10d9bd42b75178153e3af6a815bdc90f74" },
+]
+
+["libiconv"]
+files = [
+  { file = "COPYING.LIB", url = "https://git.savannah.gnu.org/cgit/libiconv.git/plain/COPYING.LIB?h=v1.18", sha256_of_download = "20e50fe7aae3e56378ebf0417d9de904f55a0e61e4df315333e632a4d3555d95" },
+]
+
+["libjpeg-turbo"]
+files = [
+  { file = "LICENSE.md", url = "https://raw.githubusercontent.com/libjpeg-turbo/libjpeg-turbo/3.1.4/LICENSE.md", sha256_of_download = "e10114e6e40f3d0311c401ca25245ac5ef459a43c20f976fd63f03e816f5741f" },
+  { file = "README.ijg", url = "https://raw.githubusercontent.com/libjpeg-turbo/libjpeg-turbo/3.1.4/README.ijg", sha256_of_download = "75815e3bf6484201a3c3d17a1bbf10f2e8e3237f84df10a2357ea896db2a81d6" },
+]
+
+["libpng"]
+files = [
+  { file = "LICENSE", url = "https://raw.githubusercontent.com/pnggroup/libpng/v1.6.58/LICENSE", sha256_of_download = "bdb0a645ea18c60507d0368379b1ac5474b92255fcc2d115e07486a7672ba526" },
+]
+
+["libquadmath"]
+files = [
+  { file = "COPYING.LIB", url = "https://raw.githubusercontent.com/gcc-mirror/gcc/releases/gcc-8.5.0/libquadmath/COPYING.LIB", sha256_of_download = "32434afcc8666ba060e111d715bfdb6c2d5dd8a35fa4d3ab8ad67d8f850d2f2b" },
+]
+
+["libselinux"]
+files = [
+  { file = "LICENSE", url = "https://raw.githubusercontent.com/SELinuxProject/selinux/libselinux-2.5/libselinux/LICENSE", sha256_of_download = "86657b4c0fe868d7cbd977cb04c63b6c667e08fa51595a7bc846ad4bed8fc364" },
+]
+
+["libtiff"]
+files = [
+  { file = "LICENSE.md", url = "https://gitlab.com/libtiff/libtiff/-/raw/v4.7.1/LICENSE.md", sha256_of_download = "0e27c2382d7b8147972bbb746e04059a1152c8d0fda9d03ef1399d1a433c4ade" },
+]
+
+["libwebp"]
+files = [
+  { file = "COPYING", url = "https://raw.githubusercontent.com/webmproject/libwebp/v1.6.0/COPYING", sha256_of_download = "5aec868f669e384a22372a4e8a1a6cd7d44c64cd451f960ca69cc170d1e13acf" },
+  { file = "PATENTS", url = "https://raw.githubusercontent.com/webmproject/libwebp/v1.6.0/PATENTS", sha256_of_download = "cc3273e0694ea5896145e0677699b53471b03ea43021ddc50e7923fbb9f5023c" },
+]
+
+["libxau"]
+files = [
+  { file = "COPYING", url = "https://gitlab.freedesktop.org/xorg/lib/libxau/-/raw/libXau-1.0.12/COPYING", sha256_of_download = "56abe29bb1d9806a9e04fa9f80fed2c0f18027594df3f098148d814aef6bddfa" },
+]
+
+["libxcb"]
+files = [
+  { file = "COPYING", url = "https://gitlab.freedesktop.org/xorg/lib/libxcb/-/raw/libxcb-1.17.0/COPYING", sha256_of_download = "c5ffbfeaa501071ceeb97b7de2c0d703fdaa35de01c0fb6cbac1c28453a3e9fd" },
+]
+
+["libxcrypt"]
+files = [
+  { file = "COPYING.LIB", url = "https://raw.githubusercontent.com/besser82/libxcrypt/v4.5.2/COPYING.LIB", sha256_of_download = "dc626520dcd53a22f727af3ee42c770e56c97a64fe3adb063799d8ab032fe551" },
+  { file = "LICENSING", url = "https://raw.githubusercontent.com/besser82/libxcrypt/v4.5.2/LICENSING", sha256_of_download = "9144e66d8140feb84f0e4e344906ac425378896320032e0248567ef195cf0135" },
+]
+
+["libxml2"]
+files = [
+  { file = "Copyright", url = "https://gitlab.gnome.org/GNOME/libxml2/-/raw/v2.14.6/Copyright", sha256_of_download = "5d4873884a890122a4b9b20ad56ac6f7da1d796a5bfcf04a427970ac96217626" },
+]
+
+["libxslt"]
+files = [
+  { file = "Copyright", url = "https://gitlab.gnome.org/GNOME/libxslt/-/raw/v1.1.43/Copyright", sha256_of_download = "7e48e290b6bfccc2ec1b297023a1d77f2fd87417f71fbb9f50aabef40a851819" },
+]
+
+["netcdf-c"]
+files = [
+  { file = "COPYRIGHT", url = "https://raw.githubusercontent.com/Unidata/netcdf-c/v4.10.1/COPYRIGHT", sha256_of_download = "d3b81bcbe2b4fd7057e7bc603f58dd0c855c5c9b5635966d2c22d9a13f384fb8" },
+]
+
+["nghttp2"]
+files = [
+  { file = "COPYING", url = "https://raw.githubusercontent.com/nghttp2/nghttp2/v1.69.0/COPYING", sha256_of_download = "6b94f3abc1aabd0c72a7c7d92a77f79dda7c8a0cb3df839a97890b4116a2de2a" },
+]
+
+["openjpeg"]
+files = [
+  { file = "LICENSE", url = "https://raw.githubusercontent.com/uclouvain/openjpeg/v2.5.4/LICENSE", sha256_of_download = "a6af136f3e15038a666b61f376612a07d9a4e48cb7c01adbf3e33b3f14ab49b6" },
+]
+
+["openldap"]
+files = [
+  { file = "LICENSE", url = "https://raw.githubusercontent.com/openldap/openldap/OPENLDAP_REL_ENG_2_6_14/LICENSE", sha256_of_download = "310fe25c858a9515fc8c8d7d1f24a67c9496f84a91e0a0e41ea9975b1371e569" },
+  { file = "COPYRIGHT", url = "https://raw.githubusercontent.com/openldap/openldap/OPENLDAP_REL_ENG_2_6_14/COPYRIGHT", sha256_of_download = "5b4dfc20608c4d5d75573e899569b8ee0e06658ebcf14fa14566e309bcbab14c" },
+]
+
+["openssl"]
+files = [
+  { file = "LICENSE.txt", url = "https://raw.githubusercontent.com/openssl/openssl/openssl-3.6.2/LICENSE.txt", sha256_of_download = "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a" },
+]
+
+["pcre"]
+files = [
+  { file = "LICENCE", url = "https://vault.centos.org/7.9.2009/os/x86_64/Packages/pcre-8.32-17.el7.x86_64.rpm", sha256_of_download = "cf2b84402e9a9fcf92c8a8a965c4e8d217e82e80c0945de2ce8d46c17131ad28", extracted = "./usr/share/doc/pcre-8.32/LICENCE" },
+]
+
+["pcre2"]
+files = [
+  { file = "LICENCE.md", url = "https://raw.githubusercontent.com/PCRE2Project/pcre2/pcre2-10.47/LICENCE.md", sha256_of_download = "197d8a73ffee0d6b09adba2f9c677b5f5aede24edf89258a68e48248d010d811" },
+]
+
+["postgresql"]
+files = [
+  { file = "COPYRIGHT", url = "https://raw.githubusercontent.com/postgres/postgres/REL_18_6/COPYRIGHT", sha256_of_download = "3d6af92ff8a4c2cdf69afb1cf44edea727922f5cd0cf8b5f72b11cdecac8fdfd" },
+]
+
+["proj"]
+files = [
+  { file = "COPYING", url = "https://raw.githubusercontent.com/OSGeo/PROJ/9.8.1/COPYING", sha256_of_download = "6a8f30793e877d32e3f88b972f0970a051a3b5a26cd057d3993cb51e21c43319" },
+]
+
+["spdx"]
+files = [
+  { file = "LGPL-2.1-or-later.txt", url = "https://raw.githubusercontent.com/spdx/license-list-data/v3.29.0/text/LGPL-2.1-or-later.txt", sha256_of_download = "5749785c8bdefafcb5d798270ed0a967036fe2ca63dcedade1627565dfef81d2" },
+  { file = "LGPL-3.0-only.txt", url = "https://raw.githubusercontent.com/spdx/license-list-data/v3.29.0/text/LGPL-3.0-only.txt", sha256_of_download = "996af0513df21f7496288951c41428a03c174e9e4a9d63665c57d670f845ccb1" },
+  { file = "GPL-2.0-or-later.txt", url = "https://raw.githubusercontent.com/spdx/license-list-data/v3.29.0/text/GPL-2.0-or-later.txt", sha256_of_download = "aaf135472f81c5b4a0dca9367e5bb5e9750032b5bebe5442b36e4c0a47430df3" },
+  { file = "GPL-3.0-or-later.txt", url = "https://raw.githubusercontent.com/spdx/license-list-data/v3.29.0/text/GPL-3.0-or-later.txt", sha256_of_download = "fb981668c18a279e285fc4d83fba1e836cc84dd4daa73c9697d3cfd2d8aca6e0" },
+  { file = "GCC-exception-3.1.txt", url = "https://raw.githubusercontent.com/spdx/license-list-data/v3.29.0/text/GCC-exception-3.1.txt", sha256_of_download = "7103d4f7f7e2f8ce10d282a05e0689637f8d6d9ef7b399d808d1da313e69b960" },
+  { file = "Apache-2.0.txt", url = "https://raw.githubusercontent.com/spdx/license-list-data/v3.29.0/text/Apache-2.0.txt", sha256_of_download = "074e6e32c86a4c0ef8b3ed25b721ca23aca83df277cd88106ef7177c354615ff" },
+  { file = "MPL-2.0.txt", url = "https://raw.githubusercontent.com/spdx/license-list-data/v3.29.0/text/MPL-2.0.txt", sha256_of_download = "66a3107d5ad6a058aab753eaac2047ccb2ed0e39465dd0fe5844da3e300d5172" },
+  { file = "BSD-2-Clause.txt", url = "https://raw.githubusercontent.com/spdx/license-list-data/v3.29.0/text/BSD-2-Clause.txt", sha256_of_download = "f32fb3b417a194167cfad068223fc975ba96c5960513a10f66a3c28720aec1df" },
+]
+
+["sqlite"]
+files = [
+  { file = "LICENSE.md", url = "https://raw.githubusercontent.com/sqlite/sqlite/version-3.53.1/LICENSE.md", sha256_of_download = "ee6af51062b30d532991face5164136ae6f84e265ecf8abe89dc69dac45ca1e7" },
+]
+
+["xz"]
+files = [
+  { file = "COPYING", url = "https://raw.githubusercontent.com/tukaani-project/xz/v5.8.3/COPYING", sha256_of_download = "616a3ad264ce29b8f1cb97e53037b139d406899ca8d1f799651e17bfa09830b8" },
+  { file = "COPYING.0BSD", url = "https://raw.githubusercontent.com/tukaani-project/xz/v5.8.3/COPYING.0BSD", sha256_of_download = "0b01625d853911cd0e2e088dcfb743261034a091bb379246cb25a14cc4c74bf1" },
+]
+
+["zlib"]
+files = [
+  { file = "LICENSE", url = "https://raw.githubusercontent.com/madler/zlib/v1.3.2/LICENSE", sha256_of_download = "e32ff4e00d9d94930537635291da39e7e612703334bf6fde8c7f1686fe8a45a2" },
+]
+
+["zstd"]
+files = [
+  { file = "LICENSE", url = "https://raw.githubusercontent.com/facebook/zstd/v1.5.7/LICENSE", sha256_of_download = "7055266497633c9025b777c78eb7235af13922117480ed5c674677adc381c9d8" },
+]
+
+# Not fetched: Talus's own statement, the acknowledgement and notice the EPSG dataset's terms of use ask for
+# (https://epsg.org/terms-of-use.html, revised 8 April 2016, read 2026-11-14).
+["epsg-dataset"]
+files = [
+  { file = "NOTICE.txt", written_by = "Talus", terms = "https://epsg.org/terms-of-use.html" },
+]
+

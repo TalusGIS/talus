@@ -1,0 +1,551 @@
+# Container logs are capped per service (backlog, found 2026-10-21 writing decision-ai-substrate.md §13): Docker's
+# json-file driver has no limit by default, so a box that runs for months fills its disk with stdout. 20 MB × 5
+# files per service = at most ~100 MB each, oldest rotated away. `docker compose logs` is unchanged; the api's
+# own WARNING+ ring (V114) and the service_logs files (item 6) carry what diagnostics read, so nothing is lost
+# that the product reads. ★ Read before upgrading: the option changes every service's config, so the upgrade's
+# `up -d` recreates every container once (a few seconds each; data volumes untouched).
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
+services:
+  # The other services' ERROR/WARN logs as files (decision-ai-substrate.md §13, item 6 —
+  # errors only): one `servicelogs` volume, a directory per writer owned by that service's uid, made here as a
+  # one-shot like roles-init (a fresh named volume is root-owned; postgres runs as 999, keycloak as 1000). The api
+  # mounts the whole volume READ-ONLY and reads the tail (app/service_logs.py). Never the Docker socket.
+  logs-init:
+    image: postgis/postgis@sha256:843518fb0afec6a685a700fa6df3ab02a7e433781cf74631b63fc690967087e4 # 16-3.7 (the database's image; has coreutils)
+    volumes:
+      - servicelogs:/servicelogs
+    entrypoint: ["sh", "-c", "install -d -m 0755 -o 999 -g 999 /servicelogs/postgres && install -d -m 0755 -o 1000 -g 0 /servicelogs/keycloak && install -d -m 0755 /servicelogs/caddy"]
+    restart: "no"
+
+  postgres:
+    logging: *default-logging
+    image: postgis/postgis@sha256:843518fb0afec6a685a700fa6df3ab02a7e433781cf74631b63fc690967087e4 # 16-3.7
+    container_name: talusgis-postgres
+    depends_on:
+      logs-init:
+        condition: service_completed_successfully
+    # The server's own log collector writes ERROR-and-above lines (its defaults: log_min_messages=warning,
+    # no statement logging) to a daily file on the shared volume, truncated weekly (7 files, bounded).
+    # log_min_error_statement=panic: the statement that failed is NEVER written — it can carry a feature's
+    # attributes. 0644 so the api (uid 10001) can read what postgres (999) writes.
+    command: ["postgres", "-c", "logging_collector=on", "-c", "log_directory=/servicelogs/postgres",
+              "-c", "log_filename=postgresql-%a.log", "-c", "log_rotation_age=1d", "-c", "log_rotation_size=10MB",
+              "-c", "log_truncate_on_rotation=on", "-c", "log_file_mode=0644", "-c", "log_min_error_statement=panic"]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      # Loopback by default (Rider A, decision-talus-setup.md D4): psql/tools on the host
+      # keep working; the LAN does not get a database door. POSTGRES_PORT stays a PURE
+      # port number (nine consumers build URLs/DSNs from it — build finding, D4);
+      # the publish spec lives in POSTGRES_PUBLISH (e.g. 0.0.0.0:5432 to re-expose).
+      - "${POSTGRES_PUBLISH:-127.0.0.1:${POSTGRES_PORT:-5432}}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - servicelogs:/servicelogs
+      # Datum correction files (api/datum_grids/README.md): the NAD27 and HARN grids, read-only, at the
+      # folder where the coordinate library inside this image looks for extra files. The image carries
+      # none of its own, and without them NAD27 data is converted with no correction at all. The api
+      # image has the same files built in; the two must agree (inv56).
+      - ./api/datum_grids:/var/lib/postgresql/.local/share/proj:ro
+      # The coordinate library's reference database with the three shifting NAD83 -> WGS 84
+      # operations withdrawn (db/proj/README.md), mounted read-only over the image's own copy. Without
+      # it a layer on a NAD83(HARN) system is drawn about 0.6 m, and one on NAD83(CSRS) about 1.2 m,
+      # from every other layer of the same place.
+      # The file belongs to THIS image's version of the library: when the image pin above moves, run
+      # scripts/derive-proj-db.sh and commit db/proj/ (inv56 fails until that is done).
+      - ./db/proj/proj.db:/usr/share/proj/proj.db:ro
+      # S-1a roles moved OUT of /docker-entrypoint-initdb.d to the roles-init one-shot below
+      # (A5 2026-07-27): the initdb path was host-dependent (macOS mounts report 644 as
+      # executable -> shebang exec fails) and a failed init script leaves a healthy-looking
+      # roleless cluster (restart skips init). See db/init/00-roles.sh header.
+    healthcheck:
+      # -h 127.0.0.1 forces TCP: the postgres entrypoint's TEMPORARY init server answers on
+      # the unix socket while TCP is still off, so a socket check can mark the service
+      # healthy before the listener roles-init/flyway/keycloak/openfga actually use exists.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # S-1a cluster-global roles (talus_app / talus_tiles), as a one-shot like
+  # openfga-migrate: explicit interpreter (no exec-bit/shebang fragility), TCP, idempotent
+  # on every up. Flyway depends on this COMPLETING, so V070's precondition is structural.
+  roles-init:
+    image: postgis/postgis@sha256:843518fb0afec6a685a700fa6df3ab02a7e433781cf74631b63fc690967087e4 # 16-3.7
+    # NO container_name on purpose: the restore drill re-runs this
+    # service under its own project; a fixed name would collide with the live stack's.
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TALUS_APP_PASSWORD: ${TALUS_APP_PASSWORD}
+      TALUS_TILES_PASSWORD: ${TALUS_TILES_PASSWORD}
+    volumes:
+      - ./db/init:/init:ro
+    entrypoint: ["sh", "/init/00-roles.sh"]
+    restart: "no"
+
+  flyway:
+    image: flyway/flyway@sha256:43592cc125eb0594d9b013e8dced2fa67d473c091abaa5dec03b22f49e682949 # 10.22.0
+    container_name: talusgis-flyway
+    # Left to itself the tool asks the internet whether a newer Flyway exists on every run. The flag
+    # stops that (the image's own entrypoint is `flyway`; the verb still comes from the command line:
+    # `docker compose run --rm flyway migrate`). No environment variable does the same.
+    entrypoint: ["flyway", "-skipCheckForUpdate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      roles-init:
+        condition: service_completed_successfully
+    environment:
+      FLYWAY_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      FLYWAY_USER: ${POSTGRES_USER}
+      FLYWAY_PASSWORD: ${POSTGRES_PASSWORD}
+      # Any non-empty value turns the vendor's usage-data client off.
+      REDGATE_DISABLE_TELEMETRY: "true"
+    volumes:
+      - ./db/migrations:/flyway/sql:ro
+      - ./flyway.conf:/flyway/conf/flyway.conf:ro
+    # Flyway is invoked on-demand: `docker compose run --rm flyway migrate`
+
+  api:
+    logging: *default-logging
+    image: ghcr.io/talusgis/talus-api:v1.0.0
+    container_name: talusgis-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      openfga:
+        condition: service_healthy
+    environment:
+      # S-1a: the MAIN pool uses the least-privilege role (talus_app — cannot tamper with audit);
+      # the OWNER pool (rare runtime DDL: provisioning, view layers, geocoder index) uses the owner.
+      DATABASE_URL: postgresql://talus_app:${TALUS_APP_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      OWNER_DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      AUTH_MODE: ${AUTH_MODE:-keycloak}
+      # Deployment environment (Talus 32 — web-edge hardening). Drives secure-by-default
+      # derivations in config.py: staging/production => interactive API docs (/docs, /redoc,
+      # /openapi.json) gated OFF + JSON logs + stub-auth forbidden. Dev keeps docs on + console logs.
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      # Public / anonymous access (Talus 23) — deploy-posture master switch; default OFF
+      # (instance is NOT internet-facing unless an operator opts in). See api/app/config.py.
+      PUBLIC_ANON_ACCESS_ENABLED: ${PUBLIC_ANON_ACCESS_ENABLED:-false}
+      # Anonymous-surface rate limits (Talus 23) — per client IP, anonymous traffic ONLY; raise for
+      # a high-traffic public site. RATE_LIMIT_TRUST_FORWARDED_FOR=true only behind a trusted proxy.
+      ANON_READ_RATE_PER_MIN: ${ANON_READ_RATE_PER_MIN:-120}
+      ANON_TILE_RATE_PER_MIN: ${ANON_TILE_RATE_PER_MIN:-600}
+      # Anon full-set /export downloads (Talus 33 Open Data) — heaviest per request, so a tight bucket.
+      ANON_DOWNLOAD_RATE_PER_MIN: ${ANON_DOWNLOAD_RATE_PER_MIN:-10}
+      # Desktop tiering (decision-desktop-rate-limit-tiering.md): a VALIDATED PAT gets its own
+      # per-TOKEN ceiling instead of the anon bucket; its first (not-yet-validated) request gets the
+      # small per-IP bootstrap bucket. Neither may be 0 — that is a zero-capacity bucket that 429s
+      # every desktop request. Use RATE_LIMIT_ENABLED=false to turn the limiter off entirely.
+      AUTH_RATE_PER_MIN: ${AUTH_RATE_PER_MIN:-3000}
+      PAT_BOOTSTRAP_RATE_PER_MIN: ${PAT_BOOTSTRAP_RATE_PER_MIN:-60}
+      RATE_LIMIT_TRUST_FORWARDED_FOR: ${RATE_LIMIT_TRUST_FORWARDED_FOR:-false}
+      # Open Data (Talus 33) — the publishing org's name in the DCAT-US feed + schema.org JSON-LD.
+      # Set to the municipality's name (data.gov shows it); default is a harmless placeholder.
+      OPEN_DATA_PUBLISHER_NAME: ${OPEN_DATA_PUBLISHER_NAME:-Talus GIS}
+      # OpenFGA — the per-layer access key (Layer 7b). Internal network; store/model
+      # ids are written into .env by scripts/load-openfga-model.sh.
+      OPENFGA_API_URL: ${OPENFGA_API_URL:-http://openfga:8080}
+      OPENFGA_STORE_ID: ${OPENFGA_STORE_ID}
+      OPENFGA_MODEL_ID: ${OPENFGA_MODEL_ID}
+      # Browser origin(s) allowed to call the API (comma-separated). See api/app/config.py.
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost:5173}
+      # Internal pg_tileserv URL for the tile proxy (internal Docker network).
+      # Inert until the tile-proxy route lands (Step 3).
+      TILESERV_URL: ${TILESERV_URL:-http://pg_tileserv:7800}
+      # The portal hostname, for Admin → System's certificate probe (one in-network TLS handshake to caddy:443
+      # with this SNI; see config.py). The same .env key the edge profile uses; empty = probe not shown.
+      TALUS_HOSTNAME: ${TALUS_HOSTNAME:-}
+      # iss is a string-equality check against what Keycloak put in the token,
+      # which mirrors KC_HOSTNAME (localhost). JWKS_URL is an actual HTTP fetch
+      # from inside this container, so it must use the internal service name.
+      # The realm, explicit (decision-realm-rename.md §2) — this is the value keycloak_admin.py
+      # and the system-health probe address; the issuer/JWKS URLs below name it too and the
+      # three must agree (inv33-realm-consistency asserts it against the running stack).
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-talus}
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-http://localhost:8080/realms/talus}
+      KEYCLOAK_AUDIENCE: ${KEYCLOAK_AUDIENCE:-talus-api}
+      KEYCLOAK_JWKS_URL: ${KEYCLOAK_JWKS_URL:-http://keycloak:8080/realms/talus/protocol/openid-connect/certs}
+      # Storage seam (decision-object-store-build.md B3): media/raster/backup bytes are
+      # plain files on the storagedata volume, mounted at STORAGE_ROOT. The api streams
+      # bytes through the /media proxy — the store is never browser-exposed. The
+      # bucket-name vars below are the subtree names under the root.
+      STORAGE_ROOT: ${STORAGE_ROOT:-/storage}
+      MEDIA_BUCKET: ${MEDIA_BUCKET:-talus-media}
+      # Raster store & serve (V045+) — subtree of uploaded source COGs (+ thumbnails); read by the
+      # ingest/serve routers directly off the volume (local paths, no /vsis3/).
+      RASTER_BUCKET: ${RASTER_BUCKET:-talus-rasters}
+      # Geocoding (Talus 18c) — external locators the deployment consumes (JSON array;
+      # see api/app/config.py + .env.example). Empty by default => only the locators kept in the portal
+      # are used; a new install starts with one there.
+      GEOCODERS: ${GEOCODERS:-}
+      # Extension-module seam: comma-separated import paths, each exposing a module-level
+      # `router`, mounted at startup by app/main.py's generic loader. Empty (the default) =
+      # no extra code path exists at all — the open-core promise held structurally. A Talus+
+      # install's compose fragment sets this; core never names the modules.
+      TALUS_EXTRA_MODULES: ${TALUS_EXTRA_MODULES:-}
+      # Talus+ licence file, verified entirely offline (api/app/entitlement.py). Empty =
+      # unlicensed: licensed features are simply absent; core is untouched either way.
+      TALUS_LICENCE_PATH: ${TALUS_LICENCE_PATH:-}
+      # Talus+ AI (decision-ai-substrate.md §3.4): the PINNED Talus AI Gateway origin. Empty = the
+      # production host; `disabled` = air-gapped (no client is constructed, no socket opens). Never a
+      # request value, never an org setting — config only. Outside development, a non-talusgis.com
+      # value refuses the boot (the AI module's config guard).
+      TALUS_AI_GATEWAY_URL: ${TALUS_AI_GATEWAY_URL:-}
+      # Secrets-at-rest key (decision-geocoder-token-locators.md) — the Fernet key app/secrets.py
+      # encrypts admin-stored credentials with (first consumer: geocoder tokens, V073). Key in
+      # .env, ciphertext in the DB — neither alone is the secret. Empty = fine until an admin
+      # stores a token (the write path then 422s with the generation one-liner).
+      TALUS_ENCRYPTION_KEY: ${TALUS_ENCRYPTION_KEY:-}
+      # Keycloak Admin API provisioner (Talus 19 c4) — the portal authenticates AS the
+      # talus-provisioner confidential client to create/rotate/disable SA clients. The
+      # admin base URL + realm default to the internal network values in config.py; only
+      # the secret must be supplied (from .env, same var the bootstrap script reads).
+      TALUS_PROVISIONER_CLIENT_SECRET: ${TALUS_PROVISIONER_CLIENT_SECRET:-}
+      # The resource-server client's own secret, used for ONE thing: POST /me/password
+      # re-authenticates the caller with a direct-access grant before changing their password
+      # (decision-first-ten-minutes.md F3). Deliberately not the provisioner — talus-api is
+      # serviceAccountsEnabled:false / standardFlowEnabled:false with no redirect URIs, so this
+      # secret confers the password-grant capability and nothing else. Empty => self-service
+      # password change fails closed (503); every other path is unaffected.
+      TALUS_API_CLIENT_SECRET: ${TALUS_API_CLIENT_SECRET:-}
+      # Disaster recovery (Talus 40) — scheduled pg_dump + incremental media backup into object storage,
+      # registered in the T39 scheduler seam. Defaults: daily, 30-day retention with a 7-most-recent floor,
+      # into the internal `talus-backups` bucket. Restore is a documented runbook (docs/dr-restore-runbook.md),
+      # not an in-product button. For real host-loss DR set BACKUP_S3_* to off-host storage (same-host backups
+      # don't survive host loss). See api/app/config.py + docs/decision-dr-backup-restore.md.
+      BACKUP_ENABLED: ${BACKUP_ENABLED:-true}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      BACKUP_RETENTION_MIN_KEEP: ${BACKUP_RETENTION_MIN_KEEP:-7}
+      BACKUP_BUCKET: ${BACKUP_BUCKET:-talus-backups}
+      # EMPTY default => the api derives [MEDIA_BUCKET, RASTER_BUCKET], so the backup and the
+      # storage report always follow the actual bucket names (rasters included: dynamic tiling
+      # keeps no regenerable pyramid, so every object is irreplaceable user data). Set explicitly
+      # only to back up a different subset.
+      BACKUP_OBJECT_BUCKETS: ${BACKUP_OBJECT_BUCKETS:-}
+      # Off-host target (optional): empty => backups land on the local storage volume (a
+      # same-host copy — honestly labeled, not DR). Set ALL THREE to ship backups off-host
+      # (AWS S3 / Backblaze B2 / Wasabi / a NAS's S3 door) with no code change — that is
+      # the real host-loss protection. Partial config errors loudly rather than silently
+      # falling back to local.
+      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
+      BACKUP_S3_ACCESS_KEY: ${BACKUP_S3_ACCESS_KEY:-}
+      BACKUP_S3_SECRET_KEY: ${BACKUP_S3_SECRET_KEY:-}
+      # Client-side encryption (Talus 40.1): comma-separated age PUBLIC keys. Empty => off. When set, every
+      # artifact is age-encrypted before upload so an off-host target never holds plaintext. The api can't
+      # decrypt (it holds only the public key); the private key stays off-host for restore.
+      BACKUP_AGE_RECIPIENTS: ${BACKUP_AGE_RECIPIENTS:-}
+      # Full-system DR (Talus 42): read DSNs for Talus's OTHER two databases so a backup captures the whole
+      # system (data + identity + authz). Default to the internal Keycloak / OpenFGA Postgres so full backups
+      # are turnkey. Set BACKUP_KEYCLOAK_DB_URL= / BACKUP_OPENFGA_DB_URL= (empty) in .env to SKIP one (a
+      # deployment running that store externally) — an honest 'talusgis + media only' backup, not an error.
+      BACKUP_KEYCLOAK_DB_URL: ${BACKUP_KEYCLOAK_DB_URL-postgresql://${KEYCLOAK_DB_USER:-keycloak}:${KEYCLOAK_DB_PASSWORD}@keycloak-postgres:5432/${KEYCLOAK_DB_NAME:-keycloak}}
+      BACKUP_OPENFGA_DB_URL: ${BACKUP_OPENFGA_DB_URL-postgresql://${OPENFGA_DB_USER:-openfga}:${OPENFGA_DB_PASSWORD}@openfga-postgres:5432/${OPENFGA_DB_NAME:-openfga}}
+      # Lifeboat backup (Talus 45, decision-dr-env-lifeboat.md): include the literal .env in a backup so one
+      # set is self-contained. BACKUP_ENV_PATH is where the api reads it from — the read-only mount below.
+      # BACKUP_INCLUDE_ENV is the env DEFAULT for the include-env toggle (overridable in Admin → Backups).
+      # The .env is written ONLY age-encrypted AND only when the toggle + encryption are BOTH on (fail-closed
+      # AND); the age PRIVATE key is never backed up, so encryption holds even with .env inside.
+      BACKUP_ENV_PATH: ${BACKUP_ENV_PATH:-/secrets/.env}
+      BACKUP_INCLUDE_ENV: ${BACKUP_INCLUDE_ENV:-false}
+    ports:
+      # Loopback by default (Rider A, decision-talus-setup.md D4) — the served path is the
+      # edge (80/443); localhost:8000 stays for dev + on-box diagnostics. API_PORT stays
+      # a pure port number; override the publish spec via API_PUBLISH.
+      - "${API_PUBLISH:-127.0.0.1:${API_PORT:-8000}}:8000"
+    volumes:
+      # ★ NO source bind-mount here (S-3, decision-s3-prod-profile.md): a read-write host-source
+      # mount in a customer's stack lets a compromised container write host source (T9/B10).
+      # Development liveness lives in the gitignored docker-compose.override.yml, which compose
+      # auto-merges, so a bare `docker compose ...` keeps working with no flags. The stanza is in
+      # docker-compose.override.example.yml (dev-repo-only; it does not cross the MANIFEST).
+      # Lifeboat backup (Talus 45): the literal .env, READ-ONLY, so the backup job can capture it as an
+      # age-encrypted artifact. Read-only: the api reads it, never writes it (no in-app .env editor).
+      - ./.env:/secrets/.env:ro
+      # The storage seam's volume (decision-object-store-build.md B3): media + rasters +
+      # the local backup default live here as plain files. On the appliance, Docker
+      # volumes sit on the dedicated second disk (§12.4), so this grows with it.
+      - storagedata:/storage
+      # The other services' ERROR-level log files, READ-ONLY (item 6, decision-ai-substrate.md §13): the api
+      # tails them for the Helper's diagnostics (app/service_logs.py) and can neither write nor rotate them.
+      - servicelogs:/servicelogs:ro
+    # No --reload here: this is the stack a customer runs, and nothing in it watches source files. A
+    # development box adds it in its own docker-compose.override.yml (see the example override).
+    # --timeout-keep-alive 65: keep this in step with the image CMD (see api/Dockerfile) — QGIS's
+    # keep-alive reuse races uvicorn's 5s default close into truncated OGC pages (interop I-1).
+    # --proxy-headers: behind the Caddy edge the api must honor X-Forwarded-Proto/Host or every
+    # server-minted URL (raster tilejson tiles, WMTS capabilities) comes out http:// and browsers
+    # drop it as mixed content (B5 finding, 2026-08-10).
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--timeout-keep-alive", "65", "--proxy-headers", "--forwarded-allow-ips", "*"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=2).status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  # --- Caddy reverse proxy (Talus 32 — web-edge hardening) -------------------
+  # The hardened TLS front. OPT-IN via the `edge` profile so bare `docker compose up`
+  # stays plain-HTTP localhost (dev OIDC flow unchanged). The DOCUMENTED production
+  # bring-up is `docker compose --profile edge up`: Caddy serves the built SPA
+  # (web/dist) + reverse-proxies the api under one TLS origin, terminates TLS 1.2+,
+  # automates ACME (internal CA for *.localhost), and emits the security headers
+  # incl. HSTS + an enforced CSP. See proxy/Caddyfile. PREREQ: npm --prefix web run build.
+  caddy:
+    logging: *default-logging
+    image: caddy@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0 # 2.11.9-alpine
+    container_name: talusgis-caddy
+    profiles: ["edge"]
+    depends_on:
+      api:
+        condition: service_healthy
+      logs-init:
+        condition: service_completed_successfully
+    environment:
+      # Public hostnames Caddy serves (drive automatic cert issuance). Use *.localhost
+      # values to exercise the profile locally with Caddy's internal CA.
+      TALUS_HOSTNAME: ${TALUS_HOSTNAME:-talus.localhost}
+      KEYCLOAK_HOSTNAME: ${KEYCLOAK_HOSTNAME:-auth.localhost}
+      # where the sign-in address's root redirects (proxy/Caddyfile); install.sh --edge writes it
+      PORTAL_ORIGIN: ${PORTAL_ORIGIN:-https://${TALUS_HOSTNAME:-talus.localhost}}
+      # Empty = Caddy's automatic issuer choice. "tls internal" for LAN/air-gapped
+      # deployments with public-looking hostnames (see proxy/Caddyfile).
+      TALUS_TLS_DIRECTIVE: ${TALUS_TLS_DIRECTIVE:-}
+      # Caddy's ONE global options block lives in proxy/Caddyfile; this carries IP mode's fallback_sni
+      # into it (install.sh --edge derives it into .env for a bare-IP hostname; empty otherwise).
+      TALUS_CADDY_GLOBAL: ${TALUS_CADDY_GLOBAL:-}
+      # Who may reach the sign-in server's own admin console and master realm through the edge
+      # (proxy/Caddyfile, @kc_admin). Default: everyone — the restriction is opt-in. Unset OR empty
+      # in .env both mean the default.
+      KEYCLOAK_ADMIN_ALLOW_FROM: ${KEYCLOAK_ADMIN_ALLOW_FROM:-0.0.0.0/0 ::/0}
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./proxy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./web/dist:/srv/www:ro
+      # 9a runtime config dir (install.sh --edge writes config.json into it)
+      - ./proxy/config:/srv/config:ro
+      - caddydata:/data       # persisted certs / ACME state (no re-issue on restart)
+      - caddyconfig:/config
+      # the edge's ERROR-level log as a rolled file (proxy/Caddyfile's global `log`); no access log is written
+      - servicelogs:/servicelogs
+    restart: unless-stopped
+
+  pg_tileserv:
+    logging: *default-logging
+    # Proven 7c image, pinned by digest so a rebuild can't drift off :latest.
+    image: pramsey/pg_tileserv@sha256:e390325edd16061a4486142f08c18ee12fa22f9c5ab72928c9b36e6f79ed84be
+    container_name: talusgis-pg-tileserv
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # S-1a: SELECT-only role — pg_tileserv can no longer act as the owner (closes the T1 residual).
+      DATABASE_URL: postgresql://talus_tiles:${TALUS_TILES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    # Internal-only: NO host ports mapping. The api tile-proxy is the only door in.
+    # No healthcheck — the official image ships sh only (no bash/wget) so there's
+    # no clean in-container probe. Startup ordering is handled by depends_on
+    # (postgres healthy); the api tile-proxy's 502 is the visible failure signal
+    # if pg_tileserv is unreachable.
+    restart: unless-stopped
+
+  keycloak-postgres:
+    logging: *default-logging
+    image: postgres@sha256:0adbf25a9e96d38823bb813f3ac0ed41fadb665c88f1df7fe6dbfb060cbdc106 # 16.16-alpine
+    container_name: talusgis-keycloak-postgres
+    environment:
+      POSTGRES_DB: ${KEYCLOAK_DB_NAME:-keycloak}
+      POSTGRES_USER: ${KEYCLOAK_DB_USER:-keycloak}
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
+    volumes:
+      - kcpgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${KEYCLOAK_DB_USER:-keycloak} -d ${KEYCLOAK_DB_NAME:-keycloak}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  keycloak:
+    logging: *default-logging
+    image: quay.io/keycloak/keycloak@sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0 # 26.8.2
+    container_name: talusgis-keycloak
+    # `start --import-realm` runs in production mode and imports any JSON files
+    # under /opt/keycloak/data/import/ on first boot (idempotent across restarts).
+    # KC 26 rejects an EMPTY KC_PROXY_HEADERS (valid: forwarded | xforwarded | ABSENT), and
+    # compose interpolates an unset .env var to "" — so a plain (non --edge) .env restart-
+    # looped Keycloak (found 2026-08-12). The shim unsets the empty var before kc.sh runs.
+    entrypoint: ["/bin/bash", "-c", "[ -n \"$${KC_PROXY_HEADERS}\" ] || unset KC_PROXY_HEADERS; exec /opt/keycloak/bin/kc.sh \"$$@\"", "--"]
+    command: ["start", "--import-realm"]
+    depends_on:
+      keycloak-postgres:
+        condition: service_healthy
+      logs-init:
+        condition: service_completed_successfully
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-postgres:5432/${KEYCLOAK_DB_NAME:-keycloak}
+      KC_DB_USERNAME: ${KEYCLOAK_DB_USER:-keycloak}
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      # Keycloak speaks plain HTTP inside the compose network. In an installed stack the edge
+      # terminates TLS in front of it, and install.sh --edge sets the public URL and the proxy
+      # headers below; without the edge this is a loopback-only development door.
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+      # Behind the edge profile Keycloak must know its PUBLIC url and be told to trust
+      # the proxy's forwarded headers — otherwise it mints localhost URLs into OIDC
+      # discovery and redirects, and browser login fails (B5 edge finding, 2026-08-07;
+      # predicted by proxy/Caddyfile's header note but never wired). Dev default is
+      # unchanged (plain localhost, no proxy trust); install.sh --edge sets both.
+      KC_HOSTNAME: ${KC_PUBLIC_URL:-localhost}
+      KC_PROXY_HEADERS: ${KC_PROXY_HEADERS:-}
+      KC_HEALTH_ENABLED: "true"
+      # WARN-and-above to a file on the shared volume as well as the console (item 6; Quarkus rotates the file:
+      # 10 MB, 5 backups). The console keeps its own level. The api reads the file's tail, scrubbed.
+      KC_LOG: console,file
+      KC_LOG_FILE: /servicelogs/keycloak/keycloak.log
+      KC_LOG_FILE_LEVEL: warn
+      # Keycloak 26.8 logs a WARN every time it issues a token to a client that has "Full scope allowed"
+      # on, which is every client here (the api reads its roles from that full scope). That is one
+      # line per sign-in and per token refresh, into the file the api reads for System health. This
+      # keeps every other category at its level and that one category at ERROR.
+      KC_LOG_LEVEL: "info,org.keycloak.protocol.oidc.endpoints.TokenEndpoint.full-scope-allowed:error"
+    volumes:
+      - kcdata:/opt/keycloak/data
+      - servicelogs:/servicelogs
+      # ★★ A DIRECTORY mount, and the file inside it is named <realm>-realm.json by
+      # scripts/render-realm.sh from the template's own realm key. Two Keycloak facts make both
+      # load-bearing (learned the hard way on a clean box, 2026-09-10, during the talus-dev -> talus
+      # rename — five failed installs):
+      #   1. Keycloak 26.0 (keycloak/keycloak#36284) derives the realm NAME from an import file
+      #      named <name>-realm.json and looks THAT name up for the deferred service-account
+      #      setup. File talus-dev-realm.json + realm "talus" inside = "Session not bound to a
+      #      realm" on a fresh DB — and, worse, on a DB that already holds a talus-dev realm the
+      #      service accounts are silently bound to the WRONG realm.
+      #   2. A FILE mount is a mount point inside the kcdata volume; Docker leaves a zero-byte
+      #      stub there when the name changes, and --import-realm parses every file in the
+      #      directory: "No content to map due to end-of-input", Keycloak crash-loops. A
+      #      directory mount shadows the volume's directory, stubs included.
+      - ./keycloak/import:/opt/keycloak/data/import:ro
+      # Talus 48: the branded login theme (read-only). The realm's loginTheme="talus" selects it.
+      - ./keycloak/themes/talus:/opt/keycloak/themes/talus:ro
+    ports:
+      # Loopback by default (Rider A, decision-talus-setup.md D4) — browsers reach Keycloak
+      # through the edge (auth hostname / :8443 in IP mode), never this dev door.
+      # KEYCLOAK_PORT stays a pure port number (install.sh/suite probes build URLs from
+      # it); override the publish spec via KEYCLOAK_PUBLISH.
+      - "${KEYCLOAK_PUBLISH:-127.0.0.1:${KEYCLOAK_PORT:-8080}}:8080"
+    healthcheck:
+      # Keycloak 26 exposes the management/health endpoint on port 9000.
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && printf 'GET /health/ready HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && grep -q '\"status\": \"UP\"' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
+
+  # --- OpenFGA (Layer 7b: per-layer authorization) ---------------------------
+  # Dedicated Postgres datastore for OpenFGA. Mirrors keycloak-postgres: own
+  # container, own volume, pg_isready healthcheck. NOT shared with app/keycloak.
+  openfga-postgres:
+    logging: *default-logging
+    image: postgres@sha256:0adbf25a9e96d38823bb813f3ac0ed41fadb665c88f1df7fe6dbfb060cbdc106 # 16.16-alpine
+    container_name: talusgis-openfga-postgres
+    environment:
+      POSTGRES_DB: ${OPENFGA_DB_NAME:-openfga}
+      POSTGRES_USER: ${OPENFGA_DB_USER:-openfga}
+      POSTGRES_PASSWORD: ${OPENFGA_DB_PASSWORD}
+    volumes:
+      - openfgapgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${OPENFGA_DB_USER:-openfga} -d ${OPENFGA_DB_NAME:-openfga}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # One-shot: creates OpenFGA's tables in openfga-postgres, then exits 0.
+  # Like flyway, this is a migration step — not a long-running service.
+  openfga-migrate:
+    image: openfga/openfga@sha256:b852071314f1fda1194d341a6ebac0a4f619b3cd87a6626d2ccc7048af4ec671 # v1.22.1
+    container_name: talusgis-openfga-migrate
+    depends_on:
+      openfga-postgres:
+        condition: service_healthy
+    environment:
+      OPENFGA_DATASTORE_ENGINE: postgres
+      OPENFGA_DATASTORE_URI: postgres://${OPENFGA_DB_USER:-openfga}:${OPENFGA_DB_PASSWORD}@openfga-postgres:5432/${OPENFGA_DB_NAME:-openfga}?sslmode=disable
+    command: migrate
+    restart: "no"
+
+  # The OpenFGA server. INTERNAL-ONLY — no host ports. The api reaches it at
+  # http://openfga:8080 over the compose network (HTTP=8080, gRPC=8081).
+  # Healthcheck uses the grpc_health_probe binary the image ships (the image is
+  # distroless: no shell/curl/wget, so a gRPC probe is the only in-container option).
+  openfga:
+    logging: *default-logging
+    image: openfga/openfga@sha256:b852071314f1fda1194d341a6ebac0a4f619b3cd87a6626d2ccc7048af4ec671 # v1.22.1
+    container_name: talusgis-openfga
+    depends_on:
+      openfga-migrate:
+        condition: service_completed_successfully
+    environment:
+      OPENFGA_DATASTORE_ENGINE: postgres
+      OPENFGA_DATASTORE_URI: postgres://${OPENFGA_DB_USER:-openfga}:${OPENFGA_DB_PASSWORD}@openfga-postgres:5432/${OPENFGA_DB_NAME:-openfga}?sslmode=disable
+      # Internal-only deployment: no playground, JSON logs to match the stack.
+      OPENFGA_PLAYGROUND_ENABLED: "false"
+      OPENFGA_LOG_FORMAT: json
+    # NO ports: stanza on purpose — the api tile/auth path is the only door in.
+    command: run
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/grpc_health_probe", "-addr=:8081"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  # On-demand curl helper for loading/verifying the OpenFGA store + model from
+  # INSIDE the compose network (openfga has no host port). Same on-demand pattern
+  # as flyway: the `tools` profile keeps it out of `docker compose up`; it is run
+  # explicitly by scripts/load-openfga-model.sh and scripts/verify-openfga.sh via
+  # `docker compose run --rm openfga-cli ...`.
+  openfga-cli:
+    image: curlimages/curl@sha256:3fb7e13e5d179a845c97d78204f3f1064d1907037f26a3ebf91710571151fd93 # 8.23.0
+    container_name: talusgis-openfga-cli
+    profiles: ["tools"]
+    depends_on:
+      openfga:
+        condition: service_healthy
+    volumes:
+      - ./db/openfga:/work:ro
+    entrypoint: ["sh"]
+
+volumes:
+  pgdata:
+  kcpgdata:
+  kcdata:
+  openfgapgdata:
+  storagedata:     # the storage seam (media/rasters/backups as plain files) — B3
+  caddydata:       # Caddy persisted certs / ACME state (edge profile)
+  caddyconfig:
+  servicelogs:     # caddy/ postgres/ keycloak/ ERROR-level logs, rotated by each service; the api reads it ro (item 6)

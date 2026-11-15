@@ -1,0 +1,23 @@
+# compose.ip-mode.override.yml — the R6 IP-mode overlay, half 2 (see Caddyfile.ip-mode).
+# talus-firstboot.sh copies this to /opt/talus/docker-compose.override.yml, where
+# compose auto-merges it over the release file — the ONLY appliance-written file in the
+# release tree, and only at first boot (the bake leaves /opt/talus pristine). Two deltas:
+#
+#   - publish 8443: KEYCLOAK_HOSTNAME rides <ip>:8443 (two names can't share one bare
+#     IP's :443), and the release compose publishes 80+443 only — without this there is
+#     no door for auth. Literal on purpose: the :8443 is baked into the OIDC issuer and
+#     KC_PUBLIC_URL by install.sh's edge wiring, so parameterizing it here would lie.
+#
+#   - run Caddy on the ip-mode Caddyfile (mounted at a SIBLING path; it imports the
+#     release Caddyfile verbatim). Command mirrors the caddy image's stock CMD with only
+#     the config path changed — append-only volume semantics, no same-target shadowing.
+#
+# Rollback to stock release behavior: delete /opt/talus/docker-compose.override.yml,
+# then `docker compose --profile edge up -d --force-recreate caddy`.
+services:
+  caddy:
+    ports:
+      - "8443:8443"
+    volumes:
+      - /opt/talus-firstboot/Caddyfile.ip-mode:/etc/caddy/Caddyfile.ip-mode:ro
+    command: caddy run --config /etc/caddy/Caddyfile.ip-mode --adapter caddyfile

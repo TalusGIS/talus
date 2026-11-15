@@ -1,0 +1,13 @@
+-- V031 — Talus 27: user administration (decision-user-admin.md). Tier-2, backup-gated.
+-- Mirror a human principal's offboarding state on platform.users so the Admin -> Users list,
+-- the /me/transfer-targets picker, and org-member queries stay PURE DB (no per-request Keycloak
+-- round-trip), can exclude disabled users from transfer targets cheaply, and carry a legible
+-- "disabled on <date>".
+--
+-- NULL = active; a timestamp = the moment the user was disabled. Keycloak's `enabled` flag stays
+-- the REAL auth enforcement (disable writes BOTH; re-enable clears the column) — this column is
+-- display/filtering only, so a divergence is cosmetic, never a security gap, and self-heals on the
+-- next disable/enable. Humans only in practice: service accounts are disabled via their Keycloak
+-- client `enabled=false` (Talus 19), tracked there, not here. Nullable + no default => every
+-- existing row is active in place (no backfill). (decision-user-admin.md F2 / §4.)
+ALTER TABLE platform.users ADD COLUMN disabled_at timestamptz;

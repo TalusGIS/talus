@@ -1,0 +1,58 @@
+/* ============================================================
+   TALUS — TYPOGRAPHY TOKENS  (vendored from design-system/tokens)
+   Inter for UI & display (the brand wordmark typeface).
+   JetBrains Mono for coordinates, attribute tables, code.
+
+   LOCAL EDIT (Talus 41, F-fonts = self-host): the families lead with
+   'Inter Variable' / 'JetBrains Mono Variable' — the @font-face names
+   registered by the self-hosted @fontsource-variable packages imported
+   in main.tsx (no Google-Fonts CDN; air-gapped-ready). Plain 'Inter' /
+   'JetBrains Mono' kept as a fallback, then system fonts.
+   ============================================================ */
+:root {
+  /* Families */
+  --font-sans: 'Inter Variable', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Inter Variable', 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* Weights */
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --weight-black: 800;
+
+  /* Type scale (1.25 major-third-ish, tuned for dense data UI) */
+  --text-2xs: 11px;
+  --text-xs:  12px;
+  --text-sm:  13px;
+  --text-base: 14px;   /* default UI body */
+  --text-md:  15px;
+  --text-lg:  16px;
+  --text-xl:  18px;
+  --text-2xl: 22px;
+  --text-3xl: 28px;
+
+  /* Talus Field's floor (design review §5.2): read outdoors, at arm's length, in gloves. The portal
+     keeps the dense scale above; the phone never renders smaller than this. --text-field-body is
+     also iOS's no-zoom-on-focus threshold for inputs. */
+  --text-field-min: 14px;
+  --text-field-body: 16px;
+  --text-4xl: 36px;
+  --text-5xl: 48px;
+  --text-6xl: 64px;
+  --text-7xl: 80px;
+
+  /* Line heights */
+  --leading-tight: 1.1;
+  --leading-snug: 1.25;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.65;
+
+  /* Letter spacing — Inter display is set TIGHT (matches logo) */
+  --tracking-tighter: -0.04em;  /* big display, logo-style */
+  --tracking-tight: -0.02em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.02em;
+  --tracking-caps: 0.14em;      /* the "OPEN. INTELLIGENT. GIS." eyebrow */
+}

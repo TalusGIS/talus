@@ -1,0 +1,30 @@
+Talus GIS — third-party software notices
+
+Talus GIS is licensed under the GNU Affero General Public License v3 (see LICENSE). This release also
+includes, and its api image contains, software written by others under their own licenses:
+
+* The browser application (web/dist) bundles open-source JavaScript packages and fonts. Their notices
+  and license texts are in web/dist/third-party-licenses.txt, also shown in Talus under
+  "Open-source licenses".
+
+* The api image (ghcr.io/talusgis/talus-api) contains open-source software, some licensed under the
+  GNU GPL and LGPL. Its complete notices are inside the image at /usr/share/doc/talus/NOTICES. The
+  corresponding source code of its GPL and LGPL components is published with each release at
+  https://github.com/TalusGIS/talus/releases.
+
+* The datum correction files in api/datum_grids are the U.S. National Geodetic Survey's published grids
+  (NAD27 to NAD83, and NAD83 to NAD83(HARN)), in the form the PROJ project distributes them. They are in
+  the public domain; us_noaa_README.txt in that folder is the PROJ project's description of each.
+
+* db/proj/proj.db is the reference database of the PROJ coordinate library (MIT license), as distributed in
+  the database image named in docker-compose.yml. It contains the EPSG Geodetic Parameter Dataset, which is
+  owned by IOGP (the International Association of Oil and Gas Producers) and is used under its terms of use,
+  https://epsg.org/terms-of-use.html. Talus has changed three records in it: the operations "NAD83(HARN) to
+  WGS 84 (2)" and "(3)" and "NAD83(CSRS) to WGS 84 (2)" (EPSG codes 1900, 1901 and 1946) are marked
+  deprecated; those three records are not EPSG's data as published. Every other record is unchanged.
+  db/proj/README.md says why. The api image carries the same change in its own copies, under the same
+  terms.
+
+* The other images named in docker-compose.yml (PostgreSQL/PostGIS, Keycloak, OpenFGA, Caddy,
+  pg_tileserv, Flyway, curl) are not part of this release. Docker pulls them from their publishers,
+  under their publishers' licenses.

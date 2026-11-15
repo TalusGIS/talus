@@ -1,0 +1,77 @@
+# Security CI.
+#
+# Two tiers:
+#   - STATIC scanners (semgrep / gitleaks / trivy) — no app stack, fast, gate every PR. SAST is
+#     Semgrep CE (community rules). Scanner images float intentionally — you want current rules/CVE data.
+#   - DB-LEVEL INVARIANT (inv06 / C6) — brings up postgres via the project's own compose (initdb
+#     creates the least-priv roles) + Flyway, then asserts the runtime role cannot tamper with audit.
+#
+# NOTE: the full invariant suite's tile/slot tests (inv04/inv05) additionally need Keycloak + OpenFGA
+# + seeded users/tokens; those run against a live stack pre-merge (scripts/verify-invariants/run.sh),
+# not this from-scratch CI. Wiring a fully-seeded stack in CI is future work.
+
+name: security
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  semgrep:
+    name: SAST (Semgrep CE)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: semgrep scan
+        run: |
+          # p/ci = Semgrep's curated low-noise ruleset for PR gating. (`auto` is not used: it
+          # requires metrics on, and we keep metrics off.)
+          docker run --rm -v "$PWD":/src -w /src semgrep/semgrep:latest \
+            semgrep scan --config=p/ci --error --metrics=off
+
+  gitleaks:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: gitleaks detect
+        run: |
+          docker run --rm -v "$PWD":/repo zricethezav/gitleaks:latest \
+            detect --source=/repo --config=/repo/.gitleaks.toml --no-git --redact -v
+
+  trivy:
+    name: Deps + IaC scan (Trivy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: trivy fs
+        run: |
+          docker run --rm -v "$PWD":/repo aquasec/trivy:latest \
+            fs --scanners vuln,secret,misconfig --ignorefile /repo/.trivyignore.yaml \
+            --severity HIGH,CRITICAL --exit-code 1 --ignore-unfixed --no-progress /repo
+
+  db-invariants:
+    name: Invariant C6 (audit-role) on a real DB
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: CI .env (ephemeral test secrets)
+        run: cp .env.example .env
+      - name: Bring up postgres (initdb creates least-priv roles)
+        run: |
+          docker compose up -d postgres
+          for i in $(seq 1 30); do
+            docker compose exec -T postgres pg_isready -h 127.0.0.1 -U talus -d talusgis && break
+            sleep 2
+          done
+      - name: Apply migrations (Flyway)
+        run: docker compose run --rm flyway migrate
+      - name: inv06 — runtime role cannot tamper with audit
+        run: bash scripts/verify-invariants/inv06-audit-role.sh
+      - name: Teardown
+        if: always()
+        run: docker compose down -v
