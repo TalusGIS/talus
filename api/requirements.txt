@@ -30,6 +30,11 @@ pyarrow>=25.0.1,<26.0.0
 # (glibc). This is the deliberate GDAL dependency the raster slice accepts (cf. pyshp's "no GDAL").
 rio-tiler>=9.4.3,<10.0.0
 rio-cogeo>=7.0.2,<8.0.0
+# Pinned exactly, on purpose: numpy reaches the image through rasterio and rio-tiler, pycryptodome through minio.
+# Unpinned, a rebuild of the same release took the version published that day, which no test had run. Move either
+# pin only after the test suites have run on the new version.
+numpy==2.5.4
+pycryptodome==4.4.0
 # Attachment thumbnails (decision-attachments-a4.md §3.3): on-the-fly ≤256px JPEG for the popup strip.
 # Plain Pillow only — HEIC decoding (pillow-heif) deliberately NOT pulled in; undecodable → file chip.
 pillow>=12.3.0,<13.0.0
