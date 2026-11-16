@@ -2,53 +2,98 @@
 
 **An open-source platform that replaces ArcGIS Enterprise for organizations that don't need exotic features.**
 
-Talus GIS is an Open Core platform built for organizations whose GIS work is field data collection, web maps with simple editing, and sharing — not Utility Network, Parcel Fabric, branch versioning, or heavy imagery analytics. It's designed to be installable in five minutes with sensible defaults, operable without a dedicated GIS admin, and simpler to run and cheaper to own than ArcGIS Enterprise for the workflows it covers.
+Talus GIS is a web GIS you install on your own server. It's built for organizations whose GIS work is collecting data in
+the field, publishing web maps with simple editing, and sharing data with staff or the public. It doesn't do Utility
+Network, Parcel Fabric, branch versioning or heavy imagery analysis, and it isn't trying to.
 
-The competitive frame is **operational simplicity and total cost of ownership** — not feature parity.
+It's designed to install in five minutes with sensible defaults, to run without a dedicated GIS administrator, and to be
+simpler to run and cheaper to own than ArcGIS Enterprise for the work it covers. It doesn't try to match ArcGIS feature
+for feature. The goal is a GIS that is easy to run and costs little to own.
 
-## Status
+The core is free and open source. A paid edition, Talus+, adds support and a few extra modules (see
+[the two editions](#the-two-editions) below).
 
-**Version 1.0.** The core is complete, validated against real municipal data (12,000+ signs, over 300,000 address points, 35,000 street segments, county-scale parcels and orthoimagery), and ships as versioned releases with digest-pinned images and per-release SBOMs — see the [releases](https://github.com/TalusGIS/talus/releases) and `CHANGELOG.md`. Highlights, by area:
+## Where it stands
 
-**Portal & governance**
-- Catalog of layers, standalone tables, rasters, and web maps — ownership, favorites, transfer, delete protection, at-a-glance sharing status, where-used cross-references
-- Sharing model: private / group / organization / public, enforced fail-closed through OpenFGA; groups management UI; anonymous public access off until an administrator turns it on (Admin → Sharing & access)
-- ISO 19115-cored metadata with a completeness gate, and a curated **Open Data portal** (anonymous downloads in CSV/GeoJSON/Shapefile, DCAT-US feed, ISO-19139/QMD export)
-- Admin: user management (SSO + local, bulk CSV import, offboarding), service accounts, geocoder management, org settings, usage listings (content, sharing, members; CSV download), backups, maintenance
+This is version 1.0. It has been tested on real municipal data: more than 12,000 signs, over 300,000 address points,
+35,000 street segments, and county-wide parcels and aerial imagery. Each release is on the
+[Releases](https://github.com/TalusGIS/talus/releases) page, and `CHANGELOG.md` says what changed in each one.
 
-**Data & editing**
-- Hosted point/line/polygon layers and geometry-less tables, provisioned on demand — no slot pools, no publish step
-- Owner-defined fields, reusable coded-value domains, declarative constraint rules and defaults — all on PostgreSQL primitives, no proprietary expression engine
-- Schema import/export (CSV, GeoPackage, Esri XML Workspace), bulk feature import through the portal (Shapefile/GeoPackage/GeoJSON/KML/CSV, or a one-time copy of an ArcGIS feature layer by URL; county-scale, background jobs) with dry-run preview and reprojection
-- Working-CRS support with opt-in native projected storage (State Plane and friends), geometry calculation, feature attachments (photos/documents) on one storage authority
-- Editing with optimistic concurrency (`row_version`/`If-Match`), per-row audit trails, per-layer editing toggle; view layers as sanitized shareable lenses
+## What it does
 
-**Mapping**
-- Web map authoring: basemaps (including self-hosted imagery), per-layer filters, labels, configurable popups, bookmarks, sketch/map notes, docked attribute tables
-- Feature search (fuzzy/wildcard) and address geocoding — external locators plus a fully air-gapped internal geocoder over your own address points
-- Map export: PNG screenshot and a one-page PDF print, client-side — the PDF is georeferenced (ISO 32000 geospatial PDF), so it opens as a map in Avenza Maps, QGIS and Acrobat
-- Raster store & serve: GeoTIFF/COG, JPEG 2000 and ERDAS IMG uploads converted to COG, dynamic tiles, clip-and-download export
+**Your data**
+- Hosted point, line and polygon layers, and tables with no geometry. You create them when you need them; there's no
+  separate publishing step and no fixed number of slots.
+- Your own fields, reusable pick lists (coded-value domains), validation rules and default values. They're built on
+  ordinary PostgreSQL, with no special expression language to learn.
+- Import from Shapefile, GeoPackage, GeoJSON, KML or CSV, or make a one-time copy of an ArcGIS feature layer from its
+  URL. Imports as big as a whole county run in the background, you can preview one before it runs, and data is
+  reprojected on the way in. Layer designs can be exported and imported too (CSV, GeoPackage, or Esri XML Workspace).
+- Keep your data in your local coordinate system, such as State Plane, if you choose.
+- Calculate geometry, and attach photos and documents to features.
+- Several people can edit at the same time. If two people change the same feature, the second save is stopped rather
+  than quietly overwriting the first. Every change is recorded: who made it, when, and what it was.
+- Turn editing on or off for each layer, and share a filtered or trimmed version of a layer as a view layer without
+  copying the data.
 
-**Interoperability (no publish step — every surface is a façade over one authz-gated API)**
-- OGC API Features, WMTS, and GeoServices (FeatureServer) emulation: **ArcGIS Pro and QGIS both read *and edit* Talus layers, including attachments**, with personal access tokens
-- Deployment-level connection files (one credential-free file exposes the whole viewable catalog in Pro or QGIS), goal-first "Use in…" wizard, GeoPackage/Shapefile/CSV/GeoJSON exports
-  — **Pro users: connect via the OGC/WMTS connection files or a pasted layer link, *not* Pro's "New ArcGIS Server Connection" dialog** (it requires Esri's proprietary Admin API and fails against any non-Esri server)
-- Documented `/api/v1` with scoped service-account tokens for scripting — bring your own compute
+**Maps**
+- Build web maps with basemaps (including your own aerial imagery), filters, labels, pop-ups, bookmarks, sketches and
+  map notes, and attribute tables.
+- Search for features, with partial and approximate matching, and search addresses. Address search can use an outside geocoder or a
+  built-in one that works from your own address points with no internet connection.
+- Export a map as a PNG picture or a one-page PDF. The PDF is georeferenced, so it opens as a map in Avenza Maps, QGIS
+  and Acrobat.
+- Aerial imagery and other rasters: upload GeoTIFF, JPEG 2000 or ERDAS IMG files. Talus converts them to
+  cloud-optimized GeoTIFF, draws them as map tiles, and lets people clip out an area and download it.
 
-**Operations & trust**
-- One `docker compose` stack: PostGIS, FastAPI, Keycloak, OpenFGA, pg_tileserv, Caddy TLS edge — media/rasters/backups are plain files on a storage volume (no object-store server to run)
-- Scheduled backups of all three databases + media, with optional client-side encryption and an admin-settable off-host destination with a connection test, retention floors, restore drills, single-item recovery, self-maintenance jobs — see [`docs/dr-restore-runbook.md`](docs/dr-restore-runbook.md) and [`docs/dr-hardening.md`](docs/dr-hardening.md)
-- Security: fail-closed authorization everywhere, un-bypassable audit triggers, least-privilege runtime DB role, security headers, hardened realm defaults, and a **negative-test suite of security invariants** (`scripts/verify-invariants/`) you can run against your own install
-- Every compose image digest-pinned; CycloneDX SBOMs (source + image) attached to each release
+**The portal and sharing**
+- One catalog of your layers, tables, imagery and web maps, showing who owns each item, whether it's shared and where
+  it's used. Items can be marked as favorites, handed to a new owner, and protected from deletion.
+- Share an item with no one, a group, your whole organization, or the public. Public access is off until an
+  administrator turns it on (Admin → Sharing & access). If Talus can't confirm that someone is allowed to see
+  something, the answer is no.
+- Metadata based on ISO 19115, with a check that flags what's missing, and an Open Data page where the public can
+  download data as CSV, GeoJSON or Shapefile. It publishes a DCAT-US feed for data catalogs and exports metadata as
+  ISO 19139 or QGIS QMD.
+- Admin pages for users (single sign-on and local accounts side by side, bulk import from a CSV file, and
+  offboarding), service accounts, geocoders, organization settings, usage lists you can download as CSV, backups and
+  maintenance.
 
-Not in the open-source core by design: the Talus+ modules (dashboards, reports, story maps and Talus Field) and the AI assists of Talus+ (see below). The core carries no AI features and depends on no service run by Talus.
+**ArcGIS Pro and QGIS**
+- ArcGIS Pro and QGIS can both read *and edit* Talus layers, attachments included, using a personal access token.
+  Talus speaks OGC API Features, WMTS and the Esri FeatureServer format, so there is nothing to publish first.
+- One connection file gives Pro or QGIS everything in the catalog that person is allowed to see. A "Use in…" helper
+  walks people through it, and data downloads as GeoPackage, Shapefile, CSV or GeoJSON.
+- **ArcGIS Pro users:** connect with the connection files or a pasted layer link. Pro's "New ArcGIS Server Connection"
+  dialog won't work; it needs Esri's own administration interface, which no non-Esri server has.
+- A documented API (`/api/v1`) with service-account tokens, for your own scripts on your own computers.
 
-## Quickstart
+**Running it**
+- Everything runs as one Docker Compose stack on one Linux machine. Photos, imagery and backups are ordinary files on
+  disk, with no separate storage server to run.
+- Scheduled backups of all three databases plus the photos and files, with optional encryption, an off-site backup
+  destination you can test with one button, minimum retention, restore drills and recovery of single items.
+  Housekeeping jobs clear out temporary files on their own. See [`docs/dr-restore-runbook.md`](docs/dr-restore-runbook.md) and
+  [`docs/dr-hardening.md`](docs/dr-hardening.md).
+- Every request is checked for permission, and when a check can't be made the request is refused. The audit trail
+  can't be bypassed. Talus connects to its database with only the rights it needs, sends standard browser security
+  headers, and starts with strict sign-in settings. A set of tests in `scripts/verify-invariants/` lets you check on
+  your own server that access is refused where it should be.
+- Every container image is pinned to an exact version, and each release comes with a software bill of materials
+  (CycloneDX SBOMs for the source and the images).
 
-Requirements: a Linux host with Docker (Compose v2), plus the small tools the install scripts use — `curl`, `jq`, `python3`, `openssl` (`scripts/preflight.sh` names any that are missing, with the install command). Nothing is compiled on your machine: the web frontend ships prebuilt, and the api image is pulled digest-pinned from ghcr.
+**Not in the free version:** dashboards, reports, story maps, the Talus Field app and the AI assists. Those are part of
+Talus+. The free version has no AI features and doesn't depend on any service run by Talus GIS.
+
+## Install
+
+You need a Linux machine with Docker and Docker Compose v2, plus four small tools the install uses: `curl`, `jq`,
+`python3` and `openssl`. (`scripts/preflight.sh` checks for them and tells you how to install any that are missing.)
+Nothing is compiled on your machine: the web app comes prebuilt, and the server image is downloaded from GitHub's
+container registry at an exact, pinned version.
 
 ```bash
-# Get the latest release (or download the release tarball from the Releases page)
+# Get the latest release (or download the release file from the Releases page)
 git clone https://github.com/TalusGIS/talus.git
 cd talus
 
@@ -56,17 +101,78 @@ cd talus
 scripts/talus-setup.sh
 ```
 
-`talus-setup.sh` asks for your name, your email, a password of your own choosing (for the first administrator account, `admin` — your email signs in too), and the address your users will reach the portal at (a DNS name, or Enter for this machine's address). Nothing is installed until every question is answered; then it generates the secrets, brings up the stack with the web portal behind TLS, creates your administrator account and prints where to browse. It is safe to re-run. The full walk-through, including the first sign-in and the certificate prompt, is [`docs/install-runbook.md`](docs/install-runbook.md).
+`talus-setup.sh` asks for your name, your email, a password of your choosing for the first administrator account
+(`admin`; your email address works to sign in too), and the address people will use to reach the portal (a DNS name,
+or press Enter to use this machine's address). Nothing is installed until you've answered every question. Then it
+creates the passwords and keys the system needs, starts everything with the portal behind HTTPS, creates your
+administrator account and tells you where to browse. You can safely run it again. The full walk-through, including the
+first sign-in and the certificate warning, is in [`docs/install-runbook.md`](docs/install-runbook.md).
 
-**Back up your source data before you move it into Talus.** An import is a copy and never changes the source, but the original, whether a file geodatabase, a shapefile or a service export, is your way back. Keep it, backed up, until you have checked what came across.
+**Back up your source data before you move it into Talus.** An import is a copy and never changes the original, but the
+original (a file geodatabase, a shapefile or a service export) is your way back. Keep it, and keep it backed up, until
+you've checked what came across.
 
-**To upgrade an existing deployment:** follow [`docs/upgrade-runbook.md`](docs/upgrade-runbook.md) — a backup first, the new release's files over the old, the installer re-run, then the version's notes. Read the release's `CHANGELOG.md` entry first — its *Read before upgrading* section says what that version needs (a migration, a new image, a bundle).
+**Upgrading:** follow [`docs/upgrade-runbook.md`](docs/upgrade-runbook.md): a backup first, the new release's files over
+the old ones, the installer run again, then that version's notes. Read the release's `CHANGELOG.md` entry before you
+start; its *Read before upgrading* section says what that version needs, such as a database change, a new image or a
+new bundle.
 
-**Backups & disaster recovery:** start with [`docs/dr-hardening.md`](docs/dr-hardening.md) (getting backups off-host, trustworthily) and keep [`docs/dr-restore-runbook.md`](docs/dr-restore-runbook.md) where a disaster can't take it.
+**Backups and recovering from a disaster:** start with [`docs/dr-hardening.md`](docs/dr-hardening.md), which covers
+getting backups off the server in a way you can trust, and keep [`docs/dr-restore-runbook.md`](docs/dr-restore-runbook.md)
+somewhere a disaster can't reach.
 
-**Bugs and suggestions:** email support@talusgis.com. This repository does not use GitHub Issues. Every message is read by a person. Bugs are fixed in point releases, not parked; suggestions get an answer. How support works for each edition: [`docs/support.md`](docs/support.md).
+**Bugs and suggestions:** email support@talusgis.com. This repository doesn't use GitHub Issues. Every message is read
+by a person. Bugs are fixed in point releases rather than set aside, and suggestions get an answer. How support works
+for each edition: [`docs/support.md`](docs/support.md).
 
-## Architecture
+## The two editions
+
+| Edition | What you get | License |
+|---|---|---|
+| **Talus Community** | The full GIS: hosted layers and tables, web maps, editing, sharing, ArcGIS Pro, QGIS and QField connections, address search, imagery, backups and restore. No AI. | Open source (AGPLv3): this repository |
+| **Talus+** | Everything in Community, plus support, the paid modules (dashboards, reports, story maps, and Talus Field, the field-collection app for phones that works offline), and the AI assists. The assists are a documentation assistant any signed-in user can ask, and a diagnose mode for administrators that reads a snapshot the administrator sees before it's sent. Diagnose mode is built but not yet field-tested; it explains, and never changes anything. Authoring helpers with single-feature Vision capture are on the roadmap and not built yet; they will suggest, never decide. | Commercial subscription |
+
+**Either edition can run with no internet connection at all.** That's a way of installing it, not a separate edition.
+A Talus+ server with no internet keeps every module and only loses the AI assists. No AI feature in this release changes
+your data or suggests changes to it. Every answer from the Talus Helper is labeled as written by AI and
+names the model and the versions of the prompt and documentation behind it.
+
+## How this is built
+
+Talus is built with [Claude Code](https://docs.claude.com/en/docs/claude-code/overview), an AI coding tool, doing the
+programming, directed by the project lead. Every significant feature starts with a design discussion and a written
+decision before any code is written, and gets a security review; every new way of reaching data also gets tests that
+try to get past its access checks. Those tests are in this repository, so you can run them on your own server instead of
+taking our word for it.
+
+This repository is published one release at a time. Talus is developed in a private repository, and each release
+arrives here as a few commits, so the number of commits here counts releases, not the development history.
+`CHANGELOG.md` covers every release since the first beta in August 2026. Before a release is published it passes the
+API test suite and a license check of the third-party software it includes, and it's rehearsed as an upgrade on a
+running server before it's announced.
+
+## License
+
+Copyright © 2026 Talus GIS LLC. The core is licensed under the GNU Affero General Public License v3 (`LICENSE`).
+
+- **The core** (this repository): [GNU AGPLv3](LICENSE). It's open source and will stay that way. Because the license
+  is copyleft, no one can take this code into a closed product. A commercial license is available for organizations
+  whose policies rule out the AGPL.
+- **Third-party software:** [`NOTICES`](NOTICES), at the top of every release, lists what the server image and the web
+  app include and under which licenses. The image carries its own copy at `/usr/share/doc/talus/NOTICES`, and the web
+  app ships `third-party-licenses.txt` (linked from the sign-in screen and the account menu). Each GitHub Release
+  attaches the complete source of the GPL, LGPL and MPL components and of the Debian packages in the image. How to
+  replace an LGPL component and rebuild is in [`docs/replacing-lgpl-components.md`](docs/replacing-lgpl-components.md).
+- **Talus+ modules and AI assists:** proprietary, run by Talus GIS LLC.
+- **The "Talus GIS" name:** U.S. trademark application pending (Serial No. 50129159), owned by Talus GIS LLC.
+
+Talus doesn't accept outside code contributions. It's maintained by one person on purpose, and like SQLite it doesn't take code
+from outside. Bug reports, feature requests and notes on how Talus works with other software are welcome by email. See
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Under the hood
+
+For the people who will run it, or want to read the code.
 
 ```
 ┌──────────────────┐   ┌────────────────────┐   ┌──────────────────┐
@@ -85,57 +191,36 @@ scripts/talus-setup.sh
                                └────────┘   + pg_tileserv (MVT)
 ```
 
-**Database schemas** (four-schema layout):
-- `platform` — users, layers registry, groups, settings, metadata, tokens, backups
-- `assets` — hosted feature/table data + domain tables
-- `media` — photos and feature attachments (bytes as files on the storage volume)
-- `audit` — per-table shadow audit tables via a generic trigger function
+Every way in (the portal, OGC API Features, WMTS, the FeatureServer emulation and `/api/v1`) goes through the same API
+and the same permission checks.
 
-**Tech stack:** PostGIS · Flyway · FastAPI · psycopg3 · Pydantic v2 · React + TypeScript · MapLibre GL JS · pg_tileserv · rio-tiler · Keycloak · OpenFGA · Caddy · Docker Compose · Talus Field (the Talus+ field app, a PWA served by the same portal) · Anthropic API (Talus+ AI assists only, never in Community).
+**Database schemas:**
+- `platform`: users, the layer registry, groups, settings, metadata, tokens, backups
+- `assets`: hosted feature and table data, and domain tables
+- `media`: photos and feature attachments (the files themselves sit on the storage volume)
+- `audit`: a shadow audit table for each table, filled by one shared trigger function
 
-## Two Tiers, Either One Air-Gapped
+**Built with:** PostGIS · Flyway · FastAPI · psycopg3 · Pydantic v2 · React + TypeScript · MapLibre GL JS · pg_tileserv ·
+rio-tiler · Keycloak · OpenFGA · Caddy · Docker Compose · Talus Field (the Talus+ field app, a progressive web app served
+by the same portal) · the Anthropic API (Talus+ AI assists only, never in Community).
 
-| Tier | Includes | Licensing |
-|---|---|---|
-| **Talus Community** | The full platform: hosted layers and tables, web maps, editing, sharing, desktop and field interop, geocoding, imagery, backups and restore. No AI. | Open source (AGPLv3) — this repository |
-| **Talus+** | Everything in Community, plus support, the paid modules (dashboards, reports, story maps, and Talus Field — the offline-capable field collection app for phones), and the AI assists: a documentation assistant any signed-in user can ask, and a diagnose mode for administrators that reads a snapshot the administrator previews before it is sent (diagnose mode is built and not yet field-tested; informational, never actuating), and, on the roadmap and not yet built, authoring helpers with single-feature Vision capture (helpful, never authoritative) | Commercial subscription |
-
-**Air-gapped is a deployment mode, not a tier.** Either tier runs with no outbound connectivity — first-class, not degraded. An air-gapped Talus+ keeps every non-AI module and simply has no AI. No AI feature in this release writes or proposes data; every answer from the Talus Helper is labeled as AI-generated and names the model and the prompt and documentation versions behind it.
-
-## Repository Layout
+**What's in this repository:**
 
 ```
 talus/
-├── api/                     # FastAPI portal backend (auth, authz, routers, façades)
-├── web/                     # React + TypeScript SPA (source + the prebuilt dist that serves)
-├── db/migrations/           # Flyway SQL migrations — the schema's full history
-├── keycloak/                # Realm config + branded login theme
-├── proxy/                   # Caddy edge profile (TLS, security headers)
-├── scripts/                 # install helpers, backups/DR, talus-setup, verify-* sweeps
-│   └── verify-invariants/   # Security invariant suite — negative tests you can run yourself
-├── docs/                    # Operator guides (growing set — each published after review)
-├── docker-compose.yml       # The whole stack, every image digest-pinned
-├── NOTICES                  # Open-source notices for this release (see License below)
-└── install.sh               # The installer that scripts/talus-setup.sh drives — start with talus-setup
+├── api/                     # FastAPI portal backend (sign-in, permissions, the API and its OGC/Esri faces)
+├── web/                     # React + TypeScript web app (source, plus the prebuilt copy that's served)
+├── db/migrations/           # Flyway SQL migrations: the database's full history
+├── keycloak/                # Sign-in configuration and the branded login page
+├── proxy/                   # Caddy edge (HTTPS, security headers)
+├── scripts/                 # install helpers, backups and recovery, talus-setup, verification checks
+│   └── verify-invariants/   # Security tests you can run yourself: they try to get in where they shouldn't
+├── docs/                    # Guides for people running Talus (more are added as each is reviewed)
+├── docker-compose.yml       # The whole stack, every image pinned to an exact version
+├── NOTICES                  # Open-source notices for this release (see License above)
+└── install.sh               # The installer that scripts/talus-setup.sh runs; start with talus-setup
 ```
-
-## How this is built
-
-Talus is developed with [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) as the primary implementer, directed by the project lead, under a decision-doc-before-code discipline: every substantive capability gets a design conversation and a written decision document before implementation, plus a security review and negative tests for every new data path. The verification suite in this repository is that discipline's public face — deny-by-default proven on your install, not promised.
-
-This repository is published one release at a time. Talus is developed in a private working repository, and each release lands here as a small number of commits, so the commit count is the release count, not the development history. `CHANGELOG.md` records every release since the first beta in August 2026. Every release passes the API test suite before it is published and a third-party licence check in the release pipeline, and is rehearsed as an upgrade on a running server before it is announced.
-
-## License
-
-Copyright © 2026 Talus GIS LLC. The core is licensed under the GNU Affero General Public License v3 (`LICENSE`).
-
-- **Platform core** (this repository): [GNU AGPLv3](LICENSE) — genuinely open source, and it stays that way; copyleft means no one can absorb this code into a closed product. Commercial licensing is available for organizations whose policies preclude AGPL.
-- **Third-party software:** [`NOTICES`](NOTICES) at the root of every release lists what the api image and the web app include and under which licenses; the image carries its own copy at `/usr/share/doc/talus/NOTICES`, the web app ships `third-party-licenses.txt` (linked from the sign-in screen and the account menu), and each GitHub Release attaches the complete source of the GPL, LGPL and MPL components and the Debian packages in the image. Replacing an LGPL component and rebuilding is documented in [`docs/replacing-lgpl-components.md`](docs/replacing-lgpl-components.md).
-- **Talus+ modules and AI assists**: proprietary, operated by Talus GIS LLC
-- **"Talus GIS" trademark**: U.S. trademark application pending (Serial No. 50129159), owned by Talus GIS LLC
-
-Talus does not accept outside code contributions (solo-maintained by design — the SQLite model); bug reports, feature requests, and interop findings are genuinely welcome by email. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Project
 
-Talus GIS is operated by **Talus GIS LLC**. Domain: [talusgis.com](https://talusgis.com).
+Talus GIS is operated by **Talus GIS LLC**. Website: [talusgis.com](https://talusgis.com).
