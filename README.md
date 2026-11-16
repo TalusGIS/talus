@@ -1,8 +1,8 @@
 # Talus GIS
 
-**An open-source platform that replaces ArcGIS Enterprise for the municipal departments that don't need exotic features.**
+**An open-source platform that replaces ArcGIS Enterprise for organizations that don't need exotic features.**
 
-Talus GIS is an Open Core platform built for the ~80% of municipal GIS users whose workflows are field data collection, web maps with simple editing, and sharing — not Utility Network, Parcel Fabric, branch versioning, or heavy imagery analytics. It's designed to be installable in five minutes with sensible defaults, operable without a dedicated GIS admin, and simpler to run and cheaper to own than ArcGIS Enterprise for the workflows it covers.
+Talus GIS is an Open Core platform built for organizations whose GIS work is field data collection, web maps with simple editing, and sharing — not Utility Network, Parcel Fabric, branch versioning, or heavy imagery analytics. It's designed to be installable in five minutes with sensible defaults, operable without a dedicated GIS admin, and simpler to run and cheaper to own than ArcGIS Enterprise for the workflows it covers.
 
 The competitive frame is **operational simplicity and total cost of ownership** — not feature parity.
 
