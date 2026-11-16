@@ -254,8 +254,11 @@ Use when the database is corrupt or data was wrongly deleted/changed, but the ho
    ```
    docker compose up -d keycloak openfga api pg_tileserv
    ```
-6. **Restore the stored files** — only if the storage volume also lost data. See **"Restoring media"** above; it
-   needs the api running, which is why it comes after step 5.
+6. **Restore the stored files**, even when the storage volume is intact. A file replaced or deleted since the
+   backup is no longer in storage, and the restored rows still name it: a field project regenerated since the
+   backup, for example, would not download. On the same host, the short path in **"Restoring media"** above is one
+   command; it puts the backup's files back and leaves files added since then in place. It needs the api running,
+   which is why it comes after step 5.
 7. **Verify** — see below.
 
 ---

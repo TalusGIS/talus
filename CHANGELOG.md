@@ -104,8 +104,8 @@ round of security fixes. **A new api image. Four database migrations.**
 - **The restore drill reads stored files from the backup destination in effect**, set in Admin → Backups or in
   `.env`, and checks that it got as many as the server holds. It no longer needs a separate S3 client image, which
   could no longer be downloaded.
-- **Restoring into the existing stack drops and recreates each database first** (the runbook's commands could leave
-  a database half restored).
+- **Restoring into the existing stack drops and recreates each database first, then restores the stored files**
+  (the runbook's commands could leave a database half restored, and a file replaced since the backup missing).
 - **Each version of a field project's file is backed up;** Admin → Backups & recovery shows each backup's ID, and
   `restore-item.sh --list` shows what a backup holds.
 - **An install or upgrade never changes an existing administrator account.**
