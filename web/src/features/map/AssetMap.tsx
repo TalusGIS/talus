@@ -32,6 +32,7 @@ import {
   importFeatures,
   listCustomFields,
   queryLayerFeatures,
+  setLayerRenderer,
   transformPoint,
   updateWebMap,
   uploadFeatureAttachment,
@@ -87,10 +88,12 @@ import { buildLegendEntries, captureMapPng, defaultExportName, exportScreenshotB
 import GeocodeSearch from '@/features/map/GeocodeSearch'
 import LocatePanel, { type LocateLayer } from '@/features/map/LocatePanel'
 import LayerInspector, { InspectorDock, type InspectorTab } from '@/features/map/LayerInspector'
+import VisibilityPanel from '@/features/map/VisibilityPanel'
 import FormPanel from '@/features/map/FormPanel'
 import {
   Bookmark,
   Crosshair,
+  Eye,
   Layers2,
   LocateFixed,
   Maximize2,
@@ -102,6 +105,19 @@ import {
   SquareDashedMousePointer,
 } from 'lucide-react'
 import CloseButton from '@/components/CloseButton'
+import {
+  hasRange,
+  inRange,
+  layerBands,
+  nearestInRange,
+  outOfRangeNote,
+  legendVisibility,
+  rangeInForce,
+  scaleAt,
+  tocItemRange,
+  type ZoomPair,
+  type ZoomRange,
+} from '@/features/map/zoomRange'
 import useConfirm from '@/components/useConfirm'
 import LabelsPanel, { LABEL_DEFAULTS } from '@/features/map/LabelsPanel'
 import PopupsPanel from '@/features/map/PopupsPanel'
@@ -299,9 +315,10 @@ function pointIconLayout(
  * Point the circle/symbol pair at the current renderer, in place — no teardown.
  *
  * The zoom split is the whole mechanism: with an icon the circle stops at ICON_MIN_ZOOM and the
- * symbol starts there; without one the circle spans every zoom and the symbol draws nothing. Both
- * ranges are set through `setLayerZoomRange`, so choosing an icon never removes a source, never
- * re-tiles, and never triggers a placement pass over a whole low-zoom tile.
+ * symbol starts there; without one the circle spans every zoom and the symbol draws nothing. The
+ * split is set by applyLayerZoomRange (which also folds in the layer's visible range), through
+ * `setLayerZoomRange`, so choosing an icon never removes a source, never re-tiles, and never
+ * triggers a placement pass over a whole low-zoom tile. Every caller applies the range after this.
  */
 function applyPointIconLayout(
   map: maplibregl.Map,
@@ -309,20 +326,15 @@ function applyPointIconLayout(
   renderer: Renderer | null,
   fallbackColor: string,
 ): void {
-  const hasIcon = rendererUsesIcon(renderer)
-  const circleId = lyrId(layerId)
   const symbolId = iconLyrId(layerId)
-  if (map.getLayer(circleId)) {
-    map.setLayerZoomRange(circleId, 0, hasIcon ? iconHandoverZoom(renderer) : MAX_ZOOM)
-  }
   if (!map.getLayer(symbolId)) return
   const layout = pointIconLayout(map, renderer, fallbackColor)
   // Clearing an icon must REMOVE icon-image, not set it to undefined-ish: a symbol layer keeps its
   // last image otherwise, and the circle would draw underneath it.
   map.setLayoutProperty(symbolId, 'icon-image', layout['icon-image'] ?? null)
   map.setLayoutProperty(symbolId, 'icon-size', layout['icon-size'])
-  map.setLayerZoomRange(symbolId, iconHandoverZoom(renderer), MAX_ZOOM)
 }
+
 
 const tileUrl = (layerId: string, v: number) =>
   `${apiBaseAbsolute()}/tiles/${layerId}/{z}/{x}/{y}.pbf?v=${v}`
@@ -359,6 +371,48 @@ const subLayerIds = (layerId: string): string[] => [
   `${lyrId(layerId)}-label`, // per-layer labels symbol layer (decision-map-labels.md)
   ...selLayerIds(layerId), // table-selection highlight trio (decision-zoom-to-selected.md F3)
 ]
+
+/**
+ * Set the zoom band of every render piece of one layer from its visible range
+ * (decision-layer-zoom-range.md §3.1, §4.1): the map's own pair when it has one, else the layer's
+ * default in its renderer, else every zoom — folded together with the point icon split and the
+ * label's own start zoom (zoomRange.ts holds the rules). Idempotent and cheap: call it whenever any
+ * input changes (registration, a renderer or label change, a selection highlight or raster added,
+ * the map's range changed). A layer with no range gets exactly the bands it had before the range
+ * existed.
+ *
+ * Out of range, every layer on the layer's source is hidden, and MapLibre then asks for none of
+ * that source's tiles — which is what saves the zoomed-out parcel tiles (§1). Not an access
+ * control: the data stays readable in the table, in export and tile by tile (§11).
+ */
+function applyLayerZoomRange(
+  map: maplibregl.Map,
+  layerId: string,
+  renderer: Renderer | null,
+  mapPair: ZoomPair | undefined,
+  labelCfg: WebMapLabelConfig | undefined,
+): void {
+  const range = rangeInForce(mapPair, renderer)
+  const bands = layerBands(range, {
+    iconZoom: iconHandoverZoom(renderer),
+    hasIcon: rendererUsesIcon(renderer),
+    labelMinZoom: labelCfg?.minZoom,
+  })
+  const set = (id: string, b: { min: number; max: number }): void => {
+    if (map.getLayer(id)) map.setLayerZoomRange(id, b.min, b.max)
+  }
+  const base = lyrId(layerId)
+  // The base id is a circle for points and views (it splits at the icon zoom), a fill for polygons,
+  // a line for lines.
+  set(base, map.getLayer(base)?.type === 'circle' ? bands.circle : bands.base)
+  set(iconLyrId(layerId), bands.icon)
+  set(`${base}-line`, bands.base)
+  set(`${base}-fill`, bands.base)
+  set(`${base}-hit`, bands.base)
+  set(`${base}-label`, bands.label)
+  for (const id of selLayerIds(layerId)) set(id, bands.base)
+  set(`raster-lyr-${layerId}`, bands.base)
+}
 
 /** Add a layer's label symbol layer (decision-map-labels.md): ONE label class, text = an attribute field.
  * Works on either source type — a vector source (a built-in's baked V022 columns, or the dynamic-MVT
@@ -411,10 +465,21 @@ interface DefinitionContent {
   layerLabels: Record<string, WebMapLabelConfig>
   layerPopups: Record<string, WebMapPopupConfig>
   layerTitles: Record<string, string> // map-only display-name overrides (decision-map-rename.md)
+  layerZoomRanges: Record<string, ZoomPair> // this map's own visible ranges (decision-layer-zoom-range.md)
   mapTables: string[]
   bookmarks: WebMapBookmark[]
   sketch: SketchFeature[] // map notes (decision-sketch-layer.md) — sketch edits count as unsaved work
   fieldReady: boolean // Talus Field "Field-ready" switch (decision-talus-field-f2.md §4.4); persisted as definition.field
+}
+
+// A map's own visible range as persisted: only the ends that are set, and nothing at all for "use the
+// layer's default", so every pre-range map stays byte-identical (and never reads as unsaved).
+function zoomPairOut(p: ZoomPair | undefined): { visibleMinZoom?: number; visibleMaxZoom?: number } {
+  if (!hasRange(p)) return {}
+  return {
+    ...(typeof p?.visibleMinZoom === 'number' ? { visibleMinZoom: p.visibleMinZoom } : {}),
+    ...(typeof p?.visibleMaxZoom === 'number' ? { visibleMaxZoom: p.visibleMaxZoom } : {}),
+  }
 }
 
 function buildDefinition(c: DefinitionContent, view: WebMapDefinition['initialView']): WebMapDefinition {
@@ -450,6 +515,7 @@ function buildDefinition(c: DefinitionContent, view: WebMapDefinition['initialVi
             ...(c.layerFilters[id]?.length ? { filters: c.layerFilters[id] } : {}),
             ...(c.layerLabels[id] ? { labels: c.layerLabels[id] } : {}),
             ...(c.layerPopups[id] ? { popup: c.layerPopups[id] } : {}),
+            ...zoomPairOut(c.layerZoomRanges[id]),
           }
         : c.rasterMeta[id]
           ? {
@@ -458,6 +524,7 @@ function buildDefinition(c: DefinitionContent, view: WebMapDefinition['initialVi
               visible: c.visible[id] ?? true,
               opacity: c.rasterMeta[id].opacity,
               colormap: c.rasterMeta[id].colormap,
+              ...zoomPairOut(c.layerZoomRanges[id]),
             }
           : {
               layerId: id,
@@ -466,6 +533,7 @@ function buildDefinition(c: DefinitionContent, view: WebMapDefinition['initialVi
               ...(c.layerLabels[id] ? { labels: c.layerLabels[id] } : {}),
               ...(c.layerPopups[id] ? { popup: c.layerPopups[id] } : {}),
               ...(c.layerTitles[id] ? { title: c.layerTitles[id] } : {}),
+              ...zoomPairOut(c.layerZoomRanges[id]),
             },
     ),
     initialView: view,
@@ -503,6 +571,7 @@ function freshMapSignature(basemap: Basemap): string {
           layerLabels: {},
           layerPopups: {},
           layerTitles: {},
+          layerZoomRanges: {},
           mapTables: [],
           bookmarks: [],
           sketch: [],
@@ -1077,21 +1146,6 @@ export default function AssetMap({
     // make it fire are listed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, availRasters, webMapId])
-  // Zoom to a raster's extent (rasters carry no features to bound, so fetch its bounds from /info).
-  // Silent no-op on any failure — parity with the vector zoomToLayer.
-  const zoomToRaster = (id: string): void => {
-    const map = mapRef.current
-    const token = tokenRef.current
-    if (!map || !token) return
-    void fetchRasterInfo(id, token)
-      .then((info) => {
-        const [w, s, e, n] = info.bounds
-        map.fitBounds([[w, s], [e, n]], { padding: 48, maxZoom: 17 })
-      })
-      .catch(() => {
-        /* extent unavailable — silent no-op */
-      })
-  }
   // Auto draw-order by geometry type (AGO convention): points on top, then lines, then polygons —
   // so a freshly-added polygon never buries existing points. `selected` is front=top, so lower rank
   // = nearer the top. Rasters are a separate path, always BELOW all vectors (render effect). This is
@@ -1636,6 +1690,14 @@ export default function AssetMap({
   const [layerLabels, setLayerLabels] = useState<Record<string, WebMapLabelConfig>>({})
   const labelsRef = useRef<Record<string, WebMapLabelConfig>>({})
   labelsRef.current = layerLabels
+  // This map's OWN visible range per layer (decision-layer-zoom-range.md §3.1), keyed by layer id; absent =
+  // use the layer's default (its renderer). The ref mirrors state for the stable map callbacks, like labels.
+  const [layerZoomRanges, setLayerZoomRanges] = useState<Record<string, ZoomPair>>({})
+  const zoomRangesRef = useRef<Record<string, ZoomPair>>({})
+  zoomRangesRef.current = layerZoomRanges
+  // The map's zoom after each zoom gesture — what the layer list's out-of-range rows, the select
+  // notice and the live legend read (§5–§7). null until the map exists.
+  const [mapZoom, setMapZoom] = useState<number | null>(null)
   // Per-layer popup config (decision-map-popups.md), keyed by layerId; absent = default popups. The ref
   // mirrors state for the once-bound identify path (loadFeaturePage / openIdentifyPopup), like filters.
   const [layerPopups, setLayerPopups] = useState<Record<string, WebMapPopupConfig>>({})
@@ -2205,6 +2267,8 @@ export default function AssetMap({
       // The icon pair is re-pointed in place for EVERY geometry (a view carries a circle too), which
       // is why an icon change no longer tears the layer down.
       applyPointIconLayout(map, layerId, renderer, def.color)
+      // A changed default range (or icon zoom) moves the bands of every piece.
+      applyLayerZoomRange(map, layerId, renderer, zoomRangesRef.current[layerId], labelsRef.current[layerId])
     }
     // The docked inspector stays on the layer after a save (handoff-map-2a §1) — the float it
     // replaced used to close here.
@@ -2950,6 +3014,9 @@ export default function AssetMap({
     if (!src || src.type !== 'geojson') return
     const ext = externalsRef.current[layerId]
     if (!ext) return
+    // Out of its visible range nothing of it is drawn, so ask the remote server for nothing
+    // (decision-layer-zoom-range.md §3.1); the next pan/zoom into range fetches as usual.
+    if (!inRange(rangeInForce(zoomRangesRef.current[layerId], null), map.getZoom())) return
     const eb = map.getBounds()
     const ebbox = `${eb.getWest()},${eb.getSouth()},${eb.getEast()},${eb.getNorth()}`
     try {
@@ -2988,6 +3055,9 @@ export default function AssetMap({
       for (const lid of subLayerIds(def.id)) {
         if (map.getLayer(lid)) map.setLayoutProperty(lid, 'visibility', vis)
       }
+      // The visible zoom range rides the same every-exit-path hook (decision-layer-zoom-range.md):
+      // the bands set at addLayer above are the no-range defaults; this folds the range in.
+      applyLayerZoomRange(map, def.id, renderer, zoomRangesRef.current[def.id], labelsRef.current[def.id])
     }
 
     // Geometry-AGNOSTIC render trio — fill + line + circle off ONE source; MapLibre renders each
@@ -3255,6 +3325,8 @@ export default function AssetMap({
     const cfg = labelsRef.current[layerId]
     if (cfg) {
       addLabelLayer(map, def, cfg)
+      const renderer = configsRef.current.find((c) => c.id === layerId)?.renderer ?? null
+      applyLayerZoomRange(map, layerId, renderer, zoomRangesRef.current[layerId], cfg)
       if (map.getLayer(lid)) {
         map.setLayoutProperty(lid, 'visibility', (visibleRef.current[layerId] ?? true) ? 'visible' : 'none')
         restackRef.current?.(map, selectedRef.current) // keep the TOC draw order (labels ride their layer)
@@ -3328,13 +3400,33 @@ export default function AssetMap({
       for (const cfg of configsRef.current) {
         if (!rendererUsesIcon(cfg.renderer)) continue
         const def = layersRef.current.find((d) => d.id === cfg.id)
-        if (def) applyPointIconLayout(map, cfg.id, cfg.renderer, def.color)
+        if (def) {
+          applyPointIconLayout(map, cfg.id, cfg.renderer, def.color)
+          applyLayerZoomRange(map, cfg.id, cfg.renderer, zoomRangesRef.current[cfg.id], labelsRef.current[cfg.id])
+        }
       }
     })
     return () => {
       cancelled = true
     }
   }, [configs, registerLayerOnMap, deregisterLayerOnMap])
+
+  // A map range changed (a restore, or the Visibility tab): re-band every layer on the map. Rasters are
+  // re-banded by their own effect (they list layerZoomRanges as a dep); an external layer that comes
+  // into range is fetched at once rather than on the next pan.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || (map as unknown as { _removed?: boolean })._removed) return
+    for (const cfg of configsRef.current) {
+      if (!map.getSource(srcId(cfg.id))) continue
+      applyLayerZoomRange(map, cfg.id, cfg.renderer, layerZoomRanges[cfg.id], labelsRef.current[cfg.id])
+    }
+    for (const id of Object.keys(externalsRef.current)) {
+      if (!map.getSource(srcId(id))) continue
+      applyLayerZoomRange(map, id, null, layerZoomRanges[id], labelsRef.current[id])
+      void refreshExternalLayer(map, id)
+    }
+  }, [layerZoomRanges, refreshExternalLayer])
 
   // Selection-highlight sync (decision-zoom-to-selected.md F3): reconcile the per-layer highlight
   // trio with `tableSelections`. The trio rides the layer's OWN source filtered by id membership —
@@ -3382,11 +3474,51 @@ export default function AssetMap({
         },
       })
       added = true
+      // The highlight rides the layer's own source, so it keeps the layer's range: out of range it
+      // would be the only thing still asking for the layer's tiles.
+      applyLayerZoomRange(map, id, def?.renderer ?? null, zoomRangesRef.current[id], labelsRef.current[id])
     }
     // A fresh trio lands on top of everything; one restack folds it into the TOC draw order
     // (above its own layer's paint, below its labels).
     if (added) restackRef.current?.(map, selectedRef.current)
   }, [tableSelections])
+
+  // The Visibility tab's two writes (decision-layer-zoom-range.md §3.1, §4.3). This map's own range is map
+  // state like labels and filters: set here, applied by the layerZoomRanges effect, saved with the map
+  // (null = back to using the layer's range). The layer's default is the layer's: it goes straight to the
+  // renderer route (owner or admin, the server checks), every other renderer key kept as it is; a layer
+  // with no style yet gets the single colour it already draws in.
+  const applyMapZoomRange = (id: string, pair: ZoomPair | null): void => {
+    setLayerZoomRanges((z) => {
+      if (pair === null) {
+        if (!(id in z)) return z
+        const next = { ...z }
+        delete next[id]
+        return next
+      }
+      return { ...z, [id]: pair }
+    })
+  }
+  const saveLayerDefaultRange = async (id: string, pair: ZoomPair | null): Promise<void> => {
+    const cfg = byId(id)
+    if (!cfg || !accessToken) throw new Error('Not signed in')
+    if (!cfg.renderer && pair === null) return // nothing stored, nothing to clear
+    const base: Renderer = cfg.renderer ?? {
+      type: 'simple',
+      symbol: { color: caps?.[id]?.displayColor ?? cfg.color },
+    }
+    const next: Renderer = {
+      ...base,
+      visibleMinZoom: pair?.visibleMinZoom ?? null,
+      visibleMaxZoom: pair?.visibleMaxZoom ?? null,
+    }
+    try {
+      await setLayerRenderer(id, next, accessToken)
+    } catch (err) {
+      throw new Error(err instanceof ApiError ? `${err.message} (HTTP ${err.status})` : 'Save failed', { cause: err })
+    }
+    handleRendererSaved(id, next)
+  }
 
   // Remove a layer from the New Map: drop it from `selected`, tear it off the map, and clear any
   // UI tied to it (mirrors toggleLayer's hide-cleanup so no edit/popup lingers on a gone layer).
@@ -3482,6 +3614,12 @@ export default function AssetMap({
       delete next[id]
       return next
     })
+    setLayerZoomRanges((z) => {
+      if (!(id in z)) return z
+      const next = { ...z }
+      delete next[id]
+      return next
+    })
   }
 
   // Reorder in the TOC: dir -1 moves the layer up (toward the top of the list / draw stack), +1 down.
@@ -3495,14 +3633,59 @@ export default function AssetMap({
       return next
     })
 
+  // The range in force for one layer on this map, exactly as applyLayerZoomRange draws it
+  // (decision-layer-zoom-range.md §3.1): a raster has only the map's own pair; the sketch, every zoom.
+  const rangeOf = (id: string): ZoomRange => {
+    if (id === '__sketch') return rangeInForce(null, null)
+    if (rasterMeta[id]) return rangeInForce(zoomRangesRef.current[id], null)
+    const def = configsRef.current.find((c) => c.id === id)
+    return rangeInForce(zoomRangesRef.current[id], def?.renderer ?? null)
+  }
+  // Every "zoom to" lands where the layer is drawn (§6): a fit that would end outside the layer's
+  // range zooms to the near end of it instead, at the fit's centre, so the zoom-to never shows an
+  // empty map. Inside the range it is the plain fitBounds it always was.
+  const fitInRange = (
+    id: string,
+    bounds: maplibregl.LngLatBoundsLike,
+    opts: { padding: number; maxZoom: number },
+  ): void => {
+    const map = mapRef.current
+    if (!map) return
+    const r = rangeOf(id)
+    const cam = map.cameraForBounds(bounds, opts)
+    const fitZoom = cam?.zoom
+    if (!cam || fitZoom === undefined || inRange(r, fitZoom)) {
+      map.fitBounds(bounds, opts)
+      return
+    }
+    map.easeTo({ center: cam.center, zoom: nearestInRange(r, fitZoom) })
+  }
+  // The layer list's "Shown from zoom 14" line (§5): zoom into range at the current centre.
+  const zoomIntoRange = (id: string): void => {
+    const map = mapRef.current
+    if (!map) return
+    const z = nearestInRange(rangeOf(id), map.getZoom())
+    if (z !== map.getZoom()) map.easeTo({ zoom: z })
+  }
+
   // Zoom the map to a layer's extent — handy when a layer is added far from the current view (the
   // New Map opens US-wide). Client-side: bound the layer's features in the loaded tiles (at the
   // current view its tiles are loaded, which covers the just-added case) and fitBounds — no
-  // layer-extent API needed. Empty result (layer hidden / tiles not yet loaded) is a silent no-op.
+  // layer-extent API needed. Out of the layer's range no tiles are loaded (§6), so the layer's
+  // stored extent is asked for instead. Empty result / failed fetch is a silent no-op.
   const zoomToLayer = (id: string): void => {
     const map = mapRef.current
     const def = configsRef.current.find((c) => c.id === id)
     if (!map || !def) return
+    if (!inRange(rangeOf(id), map.getZoom())) {
+      if (!accessToken) return
+      void fetchLayerExtent(id, accessToken)
+        .then(({ bbox }) => {
+          if (bbox) fitInRange(id, [[bbox[0], bbox[1]], [bbox[2], bbox[3]]], { padding: 48, maxZoom: 17 })
+        })
+        .catch(() => undefined)
+      return
+    }
     const feats = map.querySourceFeatures(srcId(id), { sourceLayer: def.sourceLayer })
     if (feats.length === 0) return
     const bounds = new maplibregl.LngLatBounds()
@@ -3514,7 +3697,7 @@ export default function AssetMap({
       const geom = f.geometry
       if (geom && 'coordinates' in geom) extend((geom as { coordinates: unknown }).coordinates)
     }
-    if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 48, maxZoom: 17 })
+    if (!bounds.isEmpty()) fitInRange(id, bounds, { padding: 48, maxZoom: 17 })
   }
 
   // Zoom to the SELECTED features' extent (decision-zoom-to-selected.md F1) — server-computed via
@@ -3527,7 +3710,8 @@ export default function AssetMap({
     void fetchLayerExtent(id, accessToken, Array.from(ids))
       .then(({ bbox }) => {
         if (!bbox) return
-        mapRef.current?.fitBounds(
+        fitInRange(
+          id,
           [
             [bbox[0], bbox[1]],
             [bbox[2], bbox[3]],
@@ -3538,6 +3722,21 @@ export default function AssetMap({
       .catch(() => undefined)
   }
 
+  // Zoom to a raster's extent (rasters carry no features to bound, so fetch its bounds from /info).
+  // Silent no-op on any failure — parity with the vector zoomToLayer.
+  const zoomToRaster = (id: string): void => {
+    const map = mapRef.current
+    const token = tokenRef.current
+    if (!map || !token) return
+    void fetchRasterInfo(id, token)
+      .then((info) => {
+        const [w, s, e, n] = info.bounds
+        fitInRange(id, [[w, s], [e, n]], { padding: 48, maxZoom: 17 })
+      })
+      .catch(() => {
+        /* extent unavailable — silent no-op */
+      })
+  }
   // External zoom (decision-add-from-url.md): zoom to the SERVICE'S full extent, not
   // the viewport-capped loaded features — arcgis kinds re-ask the service for a 4326-projected,
   // where-scoped extent (works even for a state-plane-native ImageServer); geojson uses its document
@@ -3545,7 +3744,8 @@ export default function AssetMap({
   const zoomToExternal = (spec: ExternalLayerSpec): void => {
     void externalExtent4326(spec, extGeojsonCacheRef.current).then((ext) => {
       if (ext) {
-        mapRef.current?.fitBounds(
+        fitInRange(
+          spec.externalId,
           [
             [ext[0], ext[1]],
             [ext[2], ext[3]],
@@ -3790,6 +3990,17 @@ export default function AssetMap({
     }
     return out
   }, [selected, configs, rasterMeta, availRasters, sketch.length])
+  // Rows the map is outside the visible range of, at the zoom after the last gesture (§5).
+  const rangeNotes = useMemo(() => {
+    const out: Record<string, { text: string; canZoom: boolean }> = {}
+    if (mapZoom === null) return out
+    for (const it of tocItems) {
+      const r = tocItemRange(it, layerZoomRanges)
+      const text = r ? outOfRangeNote(r.range, mapZoom) : null
+      if (r && text) out[r.id] = { text, canZoom: r.range.min < r.range.max }
+    }
+    return out
+  }, [tocItems, layerZoomRanges, mapZoom])
 
   // PAINT basemap `b` onto `map`: remove the current basemap layers (by tracked id), add the new
   // flavor's, then restack so the user's data layers stay on top. Source/sprite/glyphs unchanged.
@@ -3951,7 +4162,7 @@ export default function AssetMap({
     const map = mapRef.current
     const c = map?.getCenter()
     return buildDefinition(
-      { basemap, order: selected, visible, rasterMeta, externals, layerFilters, layerLabels, layerPopups, layerTitles, mapTables, bookmarks, sketch, fieldReady },
+      { basemap, order: selected, visible, rasterMeta, externals, layerFilters, layerLabels, layerPopups, layerTitles, layerZoomRanges, mapTables, bookmarks, sketch, fieldReady },
       { center: c ? [c.lng, c.lat] : DEFAULT_CENTER, zoom: map?.getZoom() ?? DEFAULT_ZOOM },
     )
   }
@@ -4035,7 +4246,7 @@ export default function AssetMap({
   const handleDownloadPng = async (filename: string): Promise<string | null> => {
     const map = mapRef.current
     if (!map) return 'The map isn’t ready yet.'
-    const { blob, error } = await exportScreenshotBlob(map, tocItems, visible)
+    const { blob, error } = await exportScreenshotBlob(map, tocItems, legendVisibility(tocItems, visible, layerZoomRanges, map.getZoom()))
     if (error || !blob) return error ?? 'Export failed. Please try again.'
     downloadBlob(blob, `${filename}.png`)
     return null
@@ -4062,7 +4273,9 @@ export default function AssetMap({
     return exportMapPdf({
       source: map,
       items: tocItems,
-      visible,
+      // Printed at the live map's zoom, so a layer out of range on screen is out of range on paper
+      // (§7) — and off the legend.
+      visible: legendVisibility(tocItems, visible, layerZoomRanges, map.getZoom()),
       title: opts.title,
       orientation: opts.orientation,
       dpi: opts.dpi,
@@ -4310,20 +4523,23 @@ export default function AssetMap({
     })
     // Status-strip zoom + ratio scale (handoff-map-2a §3.4), DOM-direct like the coordinate
     // cell. Scale is the web-mercator denominator at the view center for 96 css-px/inch,
-    // rounded to 3 significant figures.
+    // rounded to 3 significant figures. Worked out by zoomRange's scaleAt — MapLibre's 512-px
+    // tiles — the same figure the Visibility tab shows; this used the 256-px constant
+    // (156543 m/px at zoom 0) and read twice the true scale.
     const updateZoomScale = (): void => {
       const zEl = zoomElRef.current
       const sEl = scaleElRef.current
       if (!zEl || !sEl) return
       const z = map.getZoom()
       zEl.textContent = `z ${z.toFixed(1)}`
-      const metersPerPx = (156543.03392 * Math.cos((map.getCenter().lat * Math.PI) / 180)) / 2 ** z
-      const denom = (metersPerPx * 96) / 0.0254
+      const denom = scaleAt(z, map.getCenter().lat)
       const mag = 10 ** Math.max(0, Math.floor(Math.log10(denom)) - 2)
       sEl.textContent = `1:${(Math.round(denom / mag) * mag).toLocaleString()}`
     }
     map.on('move', updateZoomScale)
     updateZoomScale()
+    map.on('zoomend', () => setMapZoom(map.getZoom()))
+    setMapZoom(map.getZoom())
     // Remember the last viewport (w,s,e,n) so Admin → Settings → Basemap can offer "use last
     // map view" as the extract bbox (decision-basemap-provisioning.md F6 — you can't draw a
     // bbox on a map you don't have yet, but a browsed-to viewport is a fine seed).
@@ -4525,8 +4741,10 @@ export default function AssetMap({
   const onViewRestoredRef = useRef(onViewRestored)
   onViewRestoredRef.current = onViewRestored
   useEffect(() => {
-    onLegendRef.current?.(buildLegendEntries(tocItems, { ...visible, __sketch: sketchVisible }))
-  }, [tocItems, visible, sketchVisible])
+    onLegendRef.current?.(
+      buildLegendEntries(tocItems, legendVisibility(tocItems, { ...visible, __sketch: sketchVisible }, layerZoomRanges, mapZoom)),
+    )
+  }, [tocItems, visible, sketchVisible, layerZoomRanges, mapZoom])
   useEffect(() => {
     if (!onMapApi) return
     const readView = (map: maplibregl.Map): AssetMapView => {
@@ -4653,6 +4871,8 @@ export default function AssetMap({
           map.setPaintProperty(rlyr(id), 'raster-opacity', rasterMeta[id].opacity)
         }
         map.setLayoutProperty(rlyr(id), 'visibility', (visible[id] ?? true) ? 'visible' : 'none')
+        // A raster has no layer style, so only the map's own range applies (§3.1).
+        applyLayerZoomRange(map, id, null, layerZoomRanges[id], undefined)
       }
       // A rebuilt (colormap-changed) raster layer is re-added on top; re-apply the unified draw order
       // so it returns to its TOC position (a colormap change doesn't touch `selected`, so the dedicated
@@ -4661,7 +4881,7 @@ export default function AssetMap({
     }
     return whenStyleReady(map, apply)
     // mapBuilt: a raster recorded before the map existed is added once it does (see its declaration).
-  }, [rasterMeta, visible, selected, restack, mapBuilt])
+  }, [rasterMeta, visible, selected, restack, mapBuilt, layerZoomRanges])
 
   // Refresh on-map EXTERNAL layers' GeoJSON for the current viewport on every pan/zoom (debounced),
   // since their features are bbox-scoped + capped. Externals are the only GeoJSON-refreshed kind
@@ -4759,9 +4979,15 @@ export default function AssetMap({
         const lbl: Record<string, WebMapLabelConfig> = {}
         const pop: Record<string, WebMapPopupConfig> = {}
         const ttl: Record<string, string> = {}
+        const zr: Record<string, ZoomPair> = {}
         const rmeta: Record<string, { title: string; opacity: number; colormap?: string; externalTiles?: string }> = {}
         const ext: Record<string, ExternalLayerSpec> = {}
         let vskipped = 0
+        // This map's own visible range (decision-layer-zoom-range.md), any kind; the server echoes an
+        // unset end as null, and a pair with neither end is "use the layer's default" — not stored.
+        const keepRange = (id: string, o: { visibleMinZoom?: number | null; visibleMaxZoom?: number | null }): void => {
+          if (hasRange(o)) zr[id] = { visibleMinZoom: o.visibleMinZoom ?? null, visibleMaxZoom: o.visibleMaxZoom ?? null }
+        }
         for (const o of ops) {
           if (o.kind === 'external' && o.externalId && o.externalKind && o.url) {
             // External references restore unconditionally — they're public remote URLs, not Talus
@@ -4783,6 +5009,7 @@ export default function AssetMap({
             keptIds.push(o.externalId)
             vis[o.externalId] = o.visible
             ext[o.externalId] = spec
+            keepRange(o.externalId, o)
             // Rail parity: restore the external's saved filter/labels/popup (same pattern as layers).
             if (o.filters?.length) flt[o.externalId] = o.filters
             if (o.labels) lbl[o.externalId] = o.labels
@@ -4793,6 +5020,7 @@ export default function AssetMap({
           } else if (o.kind === 'raster' && o.rasterId) {
             keptIds.push(o.rasterId)
             vis[o.rasterId] = o.visible
+            keepRange(o.rasterId, o)
             rmeta[o.rasterId] = { title: o.rasterId, opacity: o.opacity ?? 1, colormap: o.colormap }
           } else if (o.layerId && capsFor[o.layerId]?.canView) {
             keptIds.push(o.layerId)
@@ -4806,6 +5034,7 @@ export default function AssetMap({
             if (o.popup) pop[o.layerId] = o.popup
             // Map-only rename: restore the display-name override.
             if (o.title) ttl[o.layerId] = o.title
+            keepRange(o.layerId, o)
           } else if (o.kind !== 'raster') {
             vskipped++
           }
@@ -4819,6 +5048,9 @@ export default function AssetMap({
         popupsRef.current = pop
         setLayerPopups(pop)
         setLayerTitles(ttl)
+        // Ref first (like labels): the registration fired by setSelected reads the range from it.
+        zoomRangesRef.current = zr
+        setLayerZoomRanges(zr)
         // Set the ref synchronously (like filters) — the registration fired by setSelected must find
         // the external spec when its initial refreshViewLayer runs.
         externalsRef.current = ext
@@ -4870,6 +5102,7 @@ export default function AssetMap({
               layerLabels: lbl,
               layerPopups: pop,
               layerTitles: ttl,
+              layerZoomRanges: zr,
               mapTables: keptTables,
               bookmarks: def.bookmarks ?? [],
               sketch: def.sketch ?? [],
@@ -4959,6 +5192,8 @@ export default function AssetMap({
     popupsRef.current = {}
     setLayerPopups({})
     setLayerTitles({})
+    zoomRangesRef.current = {}
+    setLayerZoomRanges({})
     setSavedMap(null)
     setBookmarks([])
     setBookmarksDirty(false)
@@ -5022,7 +5257,7 @@ export default function AssetMap({
     return () => window.clearTimeout(t)
     // currentDefinition reads the same inputs listed here; it is a stable closure over refs + state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [basemap, selected, visible, rasterMeta, externals, layerFilters, layerLabels, layerPopups, layerTitles, mapTables, bookmarks, sketch, fieldReady, savedMap, mapEditable, accessToken, draftOffer])
+  }, [basemap, selected, visible, rasterMeta, externals, layerFilters, layerLabels, layerPopups, layerTitles, layerZoomRanges, mapTables, bookmarks, sketch, fieldReady, savedMap, mapEditable, accessToken, draftOffer])
   function restoreDraft(): void {
     if (!savedMap || !draftOffer) return
     pendingDraftRef.current = draftOffer.definition
@@ -5548,6 +5783,8 @@ export default function AssetMap({
             items={tocItems}
             visible={{ ...visible, __sketch: sketchVisible }}
             onToggle={toggleLayer}
+            rangeNotes={rangeNotes}
+            onZoomIntoRange={zoomIntoRange}
           />
         </div>
       )}
@@ -5581,6 +5818,24 @@ export default function AssetMap({
               <span>{importProgress}</span>
             </div>
           )}
+          {/* Select tool armed on a layer the map is outside the range of (decision-layer-zoom-range.md
+              §6): selection reads what is drawn, so say why nothing can be picked and offer the zoom. */}
+          {selectArmed !== null && rangeNotes[selectArmed.layerId]?.canZoom && mapZoom !== null &&
+            (() => {
+              const id = selectArmed.layerId
+              const zoomIn = mapZoom < rangeOf(id).min
+              return (
+                <div className="map__notice" role="status">
+                  <span>
+                    {zoomIn ? 'Zoom in' : 'Zoom out'} to select from {byId(id)?.label ?? 'this layer'}: it is{' '}
+                    {rangeNotes[id].text.toLowerCase()}.
+                  </span>
+                  <button type="button" className="btn btn--xs" onClick={() => zoomIntoRange(id)}>
+                    {zoomIn ? 'Zoom in' : 'Zoom out'}
+                  </button>
+                </div>
+              )
+            })()}
           {/* Talus 20 — F5 "layers unavailable" notice (and save errors / import results), dismissible. */}
           {mapNotice !== null && (
             <div className="map__notice" role="status">
@@ -5618,6 +5873,8 @@ export default function AssetMap({
           items={tocItems}
           visible={{ ...visible, __sketch: sketchVisible }}
           onToggle={toggleLayer}
+          rangeNotes={rangeNotes}
+          onZoomIntoRange={zoomIntoRange}
           selectedId={selectedLayerId}
           onSelect={(id) => setSelectedLayerId((cur) => (cur === id ? null : id))}
           filteredIds={filteredLayerIds}
@@ -6090,11 +6347,12 @@ export default function AssetMap({
           y={layerMenu.y}
           items={[
             // Vector externals get the READ-ONLY remote grid (AGO
-            // parity; ExternalTableView pages the remote service). Raster-kind externals have no
-            // rows, so only they hide the item.
-            ...(externals[layerMenu.layerId] &&
-            externals[layerMenu.layerId].externalKind !== 'arcgis-feature' &&
-            externals[layerMenu.layerId].externalKind !== 'geojson'
+            // parity; ExternalTableView pages the remote service). Rasters — hosted, or a raster-kind
+            // external — have no rows, so they hide the item.
+            ...(rasterMeta[layerMenu.layerId] ||
+            (externals[layerMenu.layerId] &&
+              externals[layerMenu.layerId].externalKind !== 'arcgis-feature' &&
+              externals[layerMenu.layerId].externalKind !== 'geojson')
               ? []
               : [
                   {
@@ -6156,14 +6414,31 @@ export default function AssetMap({
                   // viewers keep the READ items above.
                   ...(mapEditable
                     ? [
+                        // The one settings shortcut the menu keeps (decision-layer-zoom-range.md §4.3, lead
+                        // 2026-11-23: "agree"): someone asking "why is this layer not showing" looks here first.
+                        // A raster opens the same panel on its own in the dock: it has no inspector tabs.
                         {
-                          label: 'Rename',
-                          icon: <Pencil size={16} aria-hidden="true" />,
+                          label: 'Visible range',
+                          icon: <Eye size={15} aria-hidden="true" />,
                           onSelect: () => {
-                            setRenamingLayerId(layerMenu.layerId)
+                            setSelectedLayerId(layerMenu.layerId)
+                            setInspectorTab('visibility')
                             setLayerMenu(null)
                           },
                         },
+                        // Rename overrides a vector layer's title only (byId); rasters keep their own.
+                        ...(rasterMeta[layerMenu.layerId]
+                          ? []
+                          : [
+                              {
+                                label: 'Rename',
+                                icon: <Pencil size={16} aria-hidden="true" />,
+                                onSelect: () => {
+                                  setRenamingLayerId(layerMenu.layerId)
+                                  setLayerMenu(null)
+                                },
+                              },
+                            ]),
                       ]
                     : []),
                 ]
@@ -6308,7 +6583,8 @@ export default function AssetMap({
                 setHighlight(geometry)
                 const bbox = geojsonBbox([{ type: 'Feature', geometry, properties: {} }])
                 if (bbox) {
-                  mapRef.current?.fitBounds(
+                  fitInRange(
+                    openTableId,
                     [
                       [bbox[0], bbox[1]],
                       [bbox[2], bbox[3]],
@@ -6434,14 +6710,18 @@ export default function AssetMap({
             : null
           if (!sketchSel && !mapEditable) return null
           const cfg = !sketchSel && selectedLayerId ? byId(selectedLayerId) : undefined
+          // A selected raster (from its row menu's Visible range) has no inspector tabs: the dock shows
+          // its Visibility panel alone — this map's own range, since a raster carries no style to hold
+          // a default (decision-layer-zoom-range.md §3.1).
+          const rasterSel = !sketchSel && selectedLayerId && rasterMeta[selectedLayerId] ? selectedLayerId : null
           // A layer the user can't style never lands on a disabled Style tab (the default) —
           // display-coerce to Filter; their explicit tab choices stand everywhere else.
           const tab: InspectorTab =
             cfg && (inspectorTab === 'style' || inspectorTab === 'form') && !cfg.canManage ? 'filter' : inspectorTab
           return (
             <InspectorDock
-              hasContent={!!sketchSel || !!cfg}
-              ariaLabel={sketchSel ? 'Sketch note' : 'Layer configuration'}
+              hasContent={!!sketchSel || !!cfg || !!rasterSel}
+              ariaLabel={sketchSel ? 'Sketch note' : rasterSel ? 'Raster visibility' : 'Layer configuration'}
             >
               {sketchSel ? (
                 <SketchFeatureCard
@@ -6473,6 +6753,46 @@ export default function AssetMap({
                     setReshapingSketchId(null)
                   }}
                 />
+              ) : rasterSel ? (
+                (() => {
+                  const title =
+                    tocItems.find((t): t is Extract<TocItem, { kind: 'raster' }> => t.kind === 'raster' && t.id === rasterSel)
+                      ?.title ??
+                    rasterMeta[rasterSel].title ??
+                    rasterSel
+                  // The inspector's own header (the dock hides a panel's float-era one), with no tabs:
+                  // a raster has only this one setting here.
+                  return (
+                    <>
+                      <div className="layer-inspector__header">
+                        <span className="layer-toggle__swatch layer-toggle__swatch--raster" aria-hidden="true" />
+                        <span className="layer-inspector__name" title={title}>
+                          {title}
+                        </span>
+                        <span className="layer-inspector__geomchip">raster</span>
+                        <CloseButton
+                          onClick={() => setSelectedLayerId(null)}
+                          label="Close raster visibility"
+                          className="layer-inspector__close"
+                          title="Close (clears the selection)"
+                        />
+                      </div>
+                      <div className="layer-inspector__body">
+                        <VisibilityPanel
+                          key={rasterSel}
+                          layerLabel={title}
+                          mapPair={layerZoomRanges[rasterSel]}
+                          layerDefault={null}
+                          canSetDefault={false}
+                          map={mapRef.current}
+                          onApplyMap={(pair) => applyMapZoomRange(rasterSel, pair)}
+                          onSaveDefault={() => Promise.resolve()}
+                          onClose={() => setSelectedLayerId(null)}
+                        />
+                      </div>
+                    </>
+                  )
+                })()
               ) : (
                 <LayerInspector
               layer={
@@ -6495,6 +6815,7 @@ export default function AssetMap({
                 labels: !!(cfg && layerLabels[cfg.id]),
                 filter: !!(cfg && (layerFilters[cfg.id]?.length ?? 0) > 0),
                 popup: !!(cfg && layerPopups[cfg.id]),
+                visibility: !!cfg && (hasRange(layerZoomRanges[cfg.id]) || hasRange(cfg.renderer)),
                 form: !!(cfg && caps?.[cfg.id]?.formConfig),
               }}
               onClose={() => setSelectedLayerId(null)}
@@ -6550,6 +6871,20 @@ export default function AssetMap({
                   onSaved={(fc) =>
                     setCaps((prev) => (prev && prev[cfg.id] ? { ...prev, [cfg.id]: { ...prev[cfg.id], formConfig: fc } } : prev))
                   }
+                  onClose={() => setSelectedLayerId(null)}
+                />
+              )}
+              {cfg && tab === 'visibility' && (
+                <VisibilityPanel
+                  key={cfg.id}
+                  layerLabel={cfg.label}
+                  mapPair={layerZoomRanges[cfg.id]}
+                  // Externals carry no Talus style, so no layer default (§3.1); hosted layers and views do.
+                  layerDefault={externals[cfg.id] ? null : cfg.renderer}
+                  canSetDefault={cfg.canManage && !externals[cfg.id]}
+                  map={mapRef.current}
+                  onApplyMap={(pair) => applyMapZoomRange(cfg.id, pair)}
+                  onSaveDefault={(pair) => saveLayerDefaultRange(cfg.id, pair)}
                   onClose={() => setSelectedLayerId(null)}
                 />
               )}

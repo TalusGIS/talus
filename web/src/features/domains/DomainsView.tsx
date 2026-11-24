@@ -6,6 +6,7 @@ import { Highlight } from '@/lib/highlight'
 
 import {
   ApiError,
+  USAGE_DISCLAIMER,
   addDomainValue,
   createCustomDomain,
   deleteCustomDomain,
@@ -16,14 +17,18 @@ import {
   updateDomainValue,
 } from '@/lib/api'
 import type { CustomDomain, DomainBinding, DomainValue } from '@/lib/api'
+import { useIsAdmin, useIsPublisher } from '@/lib/auth/roles'
 import Caret from '@/components/Caret'
 
 /**
  * The org-wide **Domains** management page (data-owner-independence arc, slice 2b). Reusable coded-value
  * picklists ("domains") are define-once / bind-everywhere; this is where a data owner manages them at
- * scale. Anyone may browse (org-wide reuse); only a domain's owner or an admin may edit it
+ * scale. Anyone may browse (org-wide reuse); only a publisher or an admin may create one (the button is
+ * hidden otherwise — UI gating only, the API enforces); only a domain's owner or an admin may edit it
  * (`canEdit`, server-authoritative — the API re-enforces). Each domain shows its value count + how many
- * fields bind it ("where used"); values support add / relabel / retire-restore / reorder / delete, with
+ * fields bind it ("where used" — the server lists only bindings on layers the caller can view, so a
+ * non-admin's list carries the standard where-used disclaimer); values support add / relabel /
+ * retire-restore / reorder / delete, with
  * the server's guards surfaced (a value in use, or a bound domain, can't be hard-deleted — retire/unbind).
  *
  * Refreshed (06-main-pages.md): the shared page-header + a NEW search that matches on domain NAME or
@@ -43,6 +48,7 @@ function SearchGlyph() {
 export default function DomainsView() {
   const auth = useAuth()
   const token = auth.user?.access_token ?? ''
+  const canCreate = useIsPublisher()
 
   const [domains, setDomains] = useState<CustomDomain[] | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -139,16 +145,19 @@ export default function DomainsView() {
           <p className="eyebrow">Data model</p>
           <h1 className="mp-title">Domains</h1>
         </div>
-        <button type="button" className="btn btn--sm" onClick={() => setShowNew((s) => !s)} disabled={busy}>
-          {showNew ? 'Cancel' : '+ New domain'}
-        </button>
+        {canCreate && (
+          <button type="button" className="btn btn--sm" onClick={() => setShowNew((s) => !s)} disabled={busy}>
+            {showNew ? 'Cancel' : '+ New domain'}
+          </button>
+        )}
       </div>
       <p className="mp-intro">
         Reusable picklists. Define a domain once and bind it to fields on any layer — editing it updates
         everywhere it’s used. You can edit the domains you own; anyone can reuse them.
+        {!canCreate && ' A publisher or an administrator can add a new one.'}
       </p>
 
-      {showNew && (
+      {showNew && canCreate && (
         <div className="grp-newform">
           <h3 className="grp-newform__title">New domain</h3>
           <label className="grp-newform__field">
@@ -227,6 +236,10 @@ function DomainCard({
   const [openState, setOpenState] = useState(false)
   const [values, setValues] = useState<DomainValue[] | null>(null)
   const [usage, setUsage] = useState<DomainBinding[] | null>(null)
+  // A failed usage read must not render as "not bound": an empty list means that only when it loaded.
+  const [usageFailed, setUsageFailed] = useState(false)
+  const isAdmin = useIsAdmin()
+  const boundCount = domain.boundFieldCount ?? 0
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [newCode, setNewCode] = useState('')
@@ -235,9 +248,21 @@ function DomainCard({
   const open = forceOpen || openState
   const shownValues = values ?? preloadedValues ?? null
 
+  function loadUsage(): void {
+    getDomainUsage(domain.id, token)
+      .then((u) => {
+        setUsage(u)
+        setUsageFailed(false)
+      })
+      .catch(() => {
+        setUsage([])
+        setUsageFailed(true)
+      })
+  }
+
   function load(): void {
     getCustomDomain(domain.id, token).then((d) => setValues(d.values)).catch(() => setValues([]))
-    getDomainUsage(domain.id, token).then(setUsage).catch(() => setUsage([]))
+    loadUsage()
   }
 
   // Fetch on open. Values come free from the parent batch when searching; otherwise fetch them.
@@ -246,7 +271,7 @@ function DomainCard({
     if (values === null && !preloadedValues) {
       getCustomDomain(domain.id, token).then((d) => setValues(d.values)).catch(() => setValues([]))
     }
-    if (usage === null) getDomainUsage(domain.id, token).then(setUsage).catch(() => setUsage([]))
+    if (usage === null) loadUsage()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, preloadedValues])
 
@@ -344,8 +369,12 @@ function DomainCard({
           <p className="eyebrow dm-card__section">Used by</p>
           {usage === null ? (
             <p className="dm-card__muted">Loading…</p>
+          ) : usageFailed ? (
+            <p className="dm-card__muted">Couldn’t load where this is used.</p>
           ) : usage.length === 0 ? (
-            <p className="dm-card__muted">Not bound to any field — safe to delete.</p>
+            <p className="dm-card__muted">
+              {boundCount > 0 ? 'Not used by anything you can view.' : 'Not bound to any field — safe to delete.'}
+            </p>
           ) : (
             <div className="dm-usage">
               {usage.map((b) => (
@@ -353,12 +382,17 @@ function DomainCard({
               ))}
             </div>
           )}
+          {usage !== null && !usageFailed && !isAdmin && boundCount > 0 && (
+            <p className="dm-card__muted dm-card__disclaimer">
+              <em>{USAGE_DISCLAIMER}</em>
+            </p>
+          )}
 
           {error !== null && <p className="sign-form__error">{error}</p>}
 
           {canEdit && (
             <div className="dm-card__footer">
-              <button type="button" className="btn btn--xs btn--ghost" disabled={busy || (domain.boundFieldCount ?? 0) > 0} onClick={() => void run(() => deleteCustomDomain(domain.id, token).then(onChanged))}>
+              <button type="button" className="btn btn--xs btn--ghost" disabled={busy || boundCount > 0} onClick={() => void run(() => deleteCustomDomain(domain.id, token).then(onChanged))}>
                 Delete domain
               </button>
             </div>

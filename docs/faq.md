@@ -103,6 +103,13 @@ small organization comfortably: measured at county scale (a 300,000-parcel layer
 carry about fifteen simultaneous requests, roughly 150 named users at typical duty cycles. Adding
 CPU raises that ceiling; adding RAM does not.
 
+**Are there credits or per-user fees?** No. Nothing in Talus Community is metered, and there are no
+user licenses to buy: add the accounts you need. Talus+ is one flat price per deployment, never
+counted by users or seats. What sets the practical limit is your hardware: on a 300,000-parcel
+county layer, four vCPUs carry about fifteen simultaneous requests, roughly 150 named users at
+typical duty cycles, and adding CPU raises that ceiling. The one allowance anywhere is the Talus+
+AI assists, which pause at their ceiling and never bill on their own.
+
 **Do we need Kubernetes?** No. The graceful ladder is: one host → externalize the database and
 storage to managed services if you outgrow it → orchestration only if you genuinely reach that
 scale. Talus does not push you up the ladder.
@@ -116,6 +123,11 @@ floors, an admin-settable off-host destination (with a connection test button), 
 encryption, and written restore procedures with a restore drill you can run on your own server (`docs/dr-restore-runbook.md`). An Admin →
 Maintenance panel shows what ran and what it freed. There is no separate maintenance utility to
 learn.
+
+**Will an upgrade break our maps or dashboards?** An upgrade happens when you run it, never on its
+own. The upgrade runbook (`docs/upgrade-runbook.md`) starts with a backup that must visibly
+complete, each release is rehearsed on a test server before it is published, and the restore from
+that backup is rehearsed too.
 
 ## Common capability questions
 
@@ -176,6 +188,13 @@ learn.
   Back it up where it is. Export the geodatabase or the service, keep the copy somewhere Talus
   cannot touch, and leave the original system running until you have checked what came across.
   Imports are copies and the source is never modified, but the original is your way back.
+- **"Can we get all our data out, photos included?"** It never leaves. Your layers live in the
+  PostgreSQL database on your own server, and photos and attachments are stored beside them as
+  managed files. Scheduled backups take every database plus those files, optionally encrypted to a
+  key only you hold, to a destination you choose, and the restore is rehearsed. ArcGIS Pro and QGIS
+  read every layer through the standard doors (`docs/connect-desktop.md`), so you can save a copy in
+  any format they write, and datasets you publish download as CSV, GeoJSON, Shapefile, or
+  GeoPackage.
 - **"I'm importing a CSV — what happens to my ZIP codes, FIPS codes, and parcel IDs?"**
   Leading zeros are preserved. A CSV carries no type information, so Talus reads the header and
   the first 200 rows and picks a type per column: all whole numbers ⇒ integer, all decimals ⇒

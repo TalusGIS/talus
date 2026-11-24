@@ -14,10 +14,11 @@ to Talus Community and Talus+ alike.
 |---|---|
 | Viewer | Open layers and tables shared with them: the data table, filters, export, record detail and edit history |
 | Editor | Everything a viewer can, plus add, change and delete features and rows, import features into an existing layer, run **Calculate**, and add attachments, on layers shared with them for editing and within the owner's editing settings |
-| Publisher | Everything an editor can, plus create layers, tables and references, and use **Import data**. You own what you create and manage it from its **Manage** dialog |
+| Publisher | Everything an editor can, plus create layers, tables, references and picklist domains, and use **Import data**. You own what you create and manage it from its **Manage** dialog |
 | Administrator | Manage any layer, and edit a layer even when its owner has turned editing off |
 
-Anyone signed in can create picklist domains and reuse any domain. Sharing is covered in `guide-portal.md`.
+Anyone signed in can reuse any picklist domain; creating a new one needs the Publisher or Administrator role. Sharing
+is covered in `guide-portal.md`.
 
 ## Create a layer or a table
 
@@ -69,11 +70,14 @@ schema are flagged; add them yourself and bind a domain.
 
 ## Create and reuse picklists (domains)
 
-A domain is a reusable list of codes and labels. Create one from the **Domains** page (**+ New domain**) or inside
-**Add a field** (**Picklist values** → **Create new**). To reuse one, choose **Use existing**. Editing a domain updates
-every field that uses it. On the **Domains** page, a domain's owner or an administrator can add values (**+ value**), reorder,
-**Retire**/**Restore** them, and see **Used by**. A bound domain can't be deleted, and a value in use must be retired
-instead of deleted.
+A domain is a reusable list of codes and labels. A publisher or an administrator creates one from the **Domains** page
+(**+ New domain**) or inside **Add a field** (**Picklist values** → **Create new**). Anyone can reuse one: choose **Use
+existing**. Editing a domain updates every field that uses it. On the **Domains** page, a domain's owner or an
+administrator can add values (**+ value**), reorder, and **Retire**/**Restore** them.
+
+**Used by** lists the fields that use a domain on the layers you can view; an administrator sees all of them. A domain
+that is used anywhere can't be deleted, even where the layers using it are ones you can't see, and a value in use must
+be retired instead of deleted.
 
 On a layer with two picklist fields, **Depends on** narrows one list by the other's value.
 

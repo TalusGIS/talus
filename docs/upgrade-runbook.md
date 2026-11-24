@@ -64,6 +64,14 @@ A normal upgrade takes **well under a minute** of installer time; the backup is 
 
 ## Per-version notes
 
+### Upgrading to v1.1.0
+
+- **From 1.0.0, by the standard procedure above.** No database migration; the upgrade pulls a new api image.
+- **Talus+ needs the 1.1.0 bundle.** Apply it as step 2 of **Talus+ installs** below. Its `BASE_IMAGE_REF` names this
+  release's image; the 1.0.0 bundle is refused.
+- **Creating a picklist now needs the publisher or administrator role.** Accounts without it keep using existing
+  picklists, and nothing already created changes.
+
 ### Upgrading to v1.0.0 or later
 
 - **1.0.0 is installed fresh.** A server that ran a 0.9.0 beta is not upgraded in place: install 1.0.0 on a

@@ -12,6 +12,7 @@ import type { GeometryType, Renderer, RendererStop, SymbolizableField } from '@/
 import { RAMPS, rampColors, rampPreview } from '@/features/map/ramps'
 import CloseButton from '@/components/CloseButton'
 import IconPicker from '@/features/map/IconPicker'
+import { hasRange } from '@/features/map/zoomRange'
 
 // c7 — line dash presets (the renderer stores the raw MapLibre line-dasharray; solid = absent).
 const DASH_PRESETS: { key: string; label: string; value: number[] | null }[] = [
@@ -229,9 +230,15 @@ export default function StylesPanel({
         : geometryType === 'polygon'
           ? { fillOpacity, outlineColor, outlineWidth }
           : { pointSize, pointIcon, minZoom: pointIcon !== null ? iconFromZoom : null }
+    // The layer's visible range lives in the same renderer (decision-layer-zoom-range.md §4.1) but is set
+    // on the Visibility tab — carried through untouched, or saving a style would quietly drop it.
+    const range: Partial<Renderer> = {
+      visibleMinZoom: renderer?.visibleMinZoom ?? null,
+      visibleMaxZoom: renderer?.visibleMaxZoom ?? null,
+    }
     let payload: Renderer
     if (rtype === 'simple') {
-      payload = { type: 'simple', symbol: { color: simpleColor }, ...style }
+      payload = { type: 'simple', symbol: { color: simpleColor }, ...style, ...range }
     } else {
       if (!field || stops.length === 0) {
         setError('Choose a field with at least one value.')
@@ -245,6 +252,7 @@ export default function StylesPanel({
         default: { color: defaultColor, label: NO_VALUE_LABEL },
         stops,
         ...style,
+        ...range,
       }
     }
     try {
@@ -264,6 +272,19 @@ export default function StylesPanel({
     setBusy(true)
     setError(null)
     try {
+      // Resetting the STYLE keeps a visible range set on the Visibility tab: the layer goes back to its
+      // single colour, still drawn only at those zooms. With no range, the renderer is cleared as before.
+      if (hasRange(renderer)) {
+        const kept: Renderer = {
+          type: 'simple',
+          symbol: { color: fallbackColor },
+          visibleMinZoom: renderer?.visibleMinZoom ?? null,
+          visibleMaxZoom: renderer?.visibleMaxZoom ?? null,
+        }
+        await setLayerRenderer(layerId, kept, accessToken)
+        onSaved(kept)
+        return
+      }
       await clearLayerRenderer(layerId, accessToken)
       onSaved(null)
     } catch (err) {

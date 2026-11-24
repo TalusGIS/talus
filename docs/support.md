@@ -12,12 +12,14 @@ For Talus+ customers, the signed agreement governs.
 - **Security reports:** `security@talusgis.com`, or the repository's private vulnerability reporting. This mailbox
   is read by a person only. See `SECURITY.md`.
 - **Sales and general questions:** `info@talusgis.com`.
+- **Questions, ideas and feedback in public:** GitHub Discussions,
+  `https://github.com/TalusGIS/talus/discussions`. Read by a person. Never post a security problem there.
 
 The repository does not use GitHub Issues.
 
 ## Talus Community (free)
 
-- **Channel:** email, `support@talusgis.com`.
+- **Channel:** email, `support@talusgis.com`, or GitHub Discussions.
 - **Response commitment:** none. Every message is read by a person and answered when that is feasible. Bugs are
   fixed in point releases, not parked.
 - **Documentation:** public and kept current. It is what makes running Community practical: start at

@@ -121,8 +121,10 @@ new bundle.
 getting backups off the server in a way you can trust, and keep [`docs/dr-restore-runbook.md`](docs/dr-restore-runbook.md)
 somewhere a disaster can't reach.
 
-**Bugs and suggestions:** email support@talusgis.com. This repository doesn't use GitHub Issues. Every message is read
-by a person. Bugs are fixed in point releases rather than set aside, and suggestions get an answer. How support works
+**Questions, bugs and suggestions:** ask in [GitHub Discussions](https://github.com/TalusGIS/talus/discussions), or
+email support@talusgis.com. This repository doesn't use GitHub Issues. Every message is read by a person. Bugs are fixed
+in point releases rather than set aside, and suggestions get an answer. Never post a security problem in Discussions:
+report it privately, as [`SECURITY.md`](SECURITY.md) describes. How support works
 for each edition: [`docs/support.md`](docs/support.md).
 
 ## The two editions

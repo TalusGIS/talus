@@ -59,9 +59,10 @@ export interface LayerToggleProps {
   onOpacity?: (rasterId: string, opacity: number) => void
   onColormap?: (rasterId: string, colormap: string) => void
   onExport?: (rasterId: string) => void
-  /** Right-click layer options (decision-map-layer-table.md): vector/view rows only — a row's
-   *  onContextMenu and its ⋯ kebab both ask the caller to open the menu at viewport (x, y).
-   *  Rasters have no attribute table, so their rows don't wire it. */
+  /** Right-click layer options (decision-map-layer-table.md): a row's onContextMenu and its ⋯ kebab
+   *  both ask the caller to open the menu at viewport (x, y). Raster rows wire it too since the
+   *  visible zoom range (decision-layer-zoom-range.md): Zoom to and Visible range; the caller leaves
+   *  out what a raster has no use for (no attribute table, no selection). */
   onOpenMenu?: (layerId: string, x: number, y: number) => void
   /** Ids of ops seeded from a shared catalog reference (decision-external-catalog-items.md) — their
    *  rows wear the small link glyph so "referenced" reads at a glance, matching Catalog + picker. */
@@ -74,6 +75,11 @@ export interface LayerToggleProps {
   /** Layers with an active attribute filter (handoff-map-2a §4) — their rows wear a small amber
    *  funnel, the signal the deleted rail FilterTool's badge used to carry. */
   filteredIds?: Set<string>
+  /** Rows the map is outside the visible zoom range of (decision-layer-zoom-range.md §5), keyed by
+   *  id: the line shown under the greyed name ("Shown from zoom 14"), and whether clicking it can
+   *  zoom the map into range (not for a range that draws nowhere). Absent = drawn at this zoom. */
+  rangeNotes?: Record<string, { text: string; canZoom: boolean }>
+  onZoomIntoRange?: (id: string) => void
 }
 
 export default function LayerToggle({
@@ -92,6 +98,8 @@ export default function LayerToggle({
   selectedId,
   onSelect,
   filteredIds,
+  rangeNotes,
+  onZoomIntoRange,
 }: LayerToggleProps) {
   if (items.length === 0) return null
   // The sketch row (always items[0] when present) is not reorderable and not in the draw-order
@@ -112,8 +120,53 @@ export default function LayerToggle({
       </span>
     ) : null
 
-  // withZoom: vector rows move "Zoom to" INTO the layer-options menu (decision-map-layer-table.md),
-  // so their cluster drops the ⌖; raster rows have no menu (no attribute table) and keep it.
+  // Out of range (§5): the name greys and a line says when it is drawn. The tick box is untouched —
+  // being out of range is not being switched off. The line is a button that zooms into range.
+  const rangeLine = (id: string, label: string) => {
+    const note = rangeNotes?.[id]
+    if (!note) return null
+    return note.canZoom && onZoomIntoRange ? (
+      <button
+        type="button"
+        className="layer-toggle__range"
+        onClick={() => onZoomIntoRange(id)}
+        title={`Zoom the map to where ${label} is drawn`}
+      >
+        {note.text}
+      </button>
+    ) : (
+      <span className="layer-toggle__range">{note.text}</span>
+    )
+  }
+  const outClass = (id: string): string => (rangeNotes?.[id] ? ' is-out-of-range' : '')
+  // Right-click on the ROW opens the layer-options menu (rows only — the browser's own context menu
+  // stays available elsewhere in the pane); the ⋯ kebab is the visible/touch twin of the same gesture.
+  const menuHandler = (id: string) =>
+    onOpenMenu
+      ? (e: MouseEvent) => {
+          e.preventDefault()
+          onOpenMenu(id, e.clientX, e.clientY)
+        }
+      : undefined
+  const kebabFor = (id: string, label: string) =>
+    onOpenMenu ? (
+      <button
+        type="button"
+        className="layer-toggle__act"
+        onClick={(e) => {
+          const r = e.currentTarget.getBoundingClientRect()
+          onOpenMenu(id, r.left, r.bottom + 2)
+        }}
+        title="Layer options"
+        aria-label={`Layer options for ${label}`}
+        aria-haspopup="menu"
+      >
+        <Ellipsis size={14} aria-hidden="true" />
+      </button>
+    ) : undefined
+
+  // withZoom: a row with the layer-options menu has "Zoom to" IN it (decision-map-layer-table.md),
+  // so its cluster drops the ⌖; without a menu (the embed's legend list) the ⌖ stays.
   const actions = (id: string, label: string, i: number, extra?: ReactNode, withZoom = true) =>
     showActions || extra ? (
       <div className="layer-toggle__actions">
@@ -219,8 +272,11 @@ export default function LayerToggle({
         }
         if (it.kind === 'raster') {
           return (
-            <div className="layer-toggle__layer" key={it.id}>
-              <div className="layer-toggle__row">
+            <div
+              className={`layer-toggle__layer${selectedId === it.id ? ' is-selected' : ''}${outClass(it.id)}`}
+              key={it.id}
+            >
+              <div className="layer-toggle__row" onContextMenu={menuHandler(it.id)}>
                 <label className="layer-toggle__item">
                   <input
                     type="checkbox"
@@ -235,19 +291,26 @@ export default function LayerToggle({
                   it.id,
                   it.title,
                   i - sketchOffset,
-                  onExport && it.downloadable !== false ? (
-                    <button
-                      type="button"
-                      className="layer-toggle__act"
-                      onClick={() => onExport(it.id)}
-                      title="Export / download"
-                      aria-label={`Export ${it.title}`}
-                    >
-                      <Download size={13} aria-hidden="true" />
-                    </button>
+                  (onExport && it.downloadable !== false) || onOpenMenu ? (
+                    <>
+                      {onExport && it.downloadable !== false && (
+                        <button
+                          type="button"
+                          className="layer-toggle__act"
+                          onClick={() => onExport(it.id)}
+                          title="Export / download"
+                          aria-label={`Export ${it.title}`}
+                        >
+                          <Download size={13} aria-hidden="true" />
+                        </button>
+                      )}
+                      {kebabFor(it.id, it.title)}
+                    </>
                   ) : undefined,
+                  !onOpenMenu,
                 )}
               </div>
+              {rangeLine(it.id, it.title)}
               {onOpacity && (
                 <input
                   className="layer-toggle__opacity"
@@ -323,34 +386,12 @@ export default function LayerToggle({
             </span>
           )
 
-        // Right-click on the ROW opens the layer-options menu (rows only — the browser's own
-        // context menu stays available elsewhere in the pane); the ⋯ kebab is the visible/touch
-        // twin of the same gesture, anchored under itself.
-        const openMenu = onOpenMenu
-          ? (e: MouseEvent) => {
-              e.preventDefault()
-              onOpenMenu(c.id, e.clientX, e.clientY)
-            }
-          : undefined
-        const kebab = onOpenMenu ? (
-          <button
-            type="button"
-            className="layer-toggle__act"
-            onClick={(e) => {
-              const r = e.currentTarget.getBoundingClientRect()
-              onOpenMenu(c.id, r.left, r.bottom + 2)
-            }}
-            title="Layer options"
-            aria-label={`Layer options for ${c.label}`}
-            aria-haspopup="menu"
-          >
-            <Ellipsis size={14} aria-hidden="true" />
-          </button>
-        ) : undefined
+        const openMenu = menuHandler(c.id)
+        const kebab = kebabFor(c.id, c.label)
 
         return (
           <div
-            className={`layer-toggle__layer${selectedId === c.id ? ' is-selected' : ''}`}
+            className={`layer-toggle__layer${selectedId === c.id ? ' is-selected' : ''}${outClass(c.id)}`}
             key={c.id}
           >
             <div className="layer-toggle__row" onContextMenu={openMenu}>
@@ -390,6 +431,7 @@ export default function LayerToggle({
               </label>
               {actions(c.id, c.label, i - sketchOffset, kebab, !onOpenMenu)}
             </div>
+            {rangeLine(c.id, c.label)}
             {isUnique && (
               <ul className="layer-toggle__legend">
                 {stops.map((s) => (

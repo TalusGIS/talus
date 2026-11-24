@@ -7,7 +7,7 @@ import CloseButton from '@/components/CloseButton'
 
 /**
  * The docked layer inspector (docs/handoff-map-2a.md §1, commit 2/4): ONE right-docked surface
- * for per-layer configuration — Style · Labels · Filter · Popup — driven by the TOC selection,
+ * for per-layer configuration — Style · Labels · Filter · Popup · Visibility — driven by the TOC selection,
  * replacing the four rail flyout tools (each of which re-asked "which layer?", a question the
  * TOC had already answered) and their four floating panels. Dumb control: AssetMap owns the
  * selection, the tab, and every panel body; this renders the frame.
@@ -21,7 +21,7 @@ import CloseButton from '@/components/CloseButton'
  * No key handlers: Esc stays AssetMap's (draw sessions, menus — handoff §5).
  */
 
-export type InspectorTab = 'style' | 'labels' | 'filter' | 'popup' | 'form'
+export type InspectorTab = 'style' | 'labels' | 'filter' | 'popup' | 'visibility' | 'form'
 
 /**
  * The right dock's collapse frame — the layers TOC's pin
@@ -128,6 +128,9 @@ const TABS: { key: InspectorTab; label: string }[] = [
   { key: 'labels', label: 'Labels' },
   { key: 'filter', label: 'Filter' },
   { key: 'popup', label: 'Popup' },
+  // The zooms the layer is drawn at (decision-layer-zoom-range.md §4.3): this map's own range for anyone
+  // who can edit the map, and the layer's default for its owner or an admin.
+  { key: 'visibility', label: 'Visibility' },
   // Talus Field f2 (decision-talus-field-f2.md §4.6): the layer's form document — sections, rules,
   // templates. Manage-gated like Style (it saves to the layer); hosted slot layers only.
   { key: 'form', label: 'Form' },
@@ -157,7 +160,7 @@ export default function LayerInspector({
     <>
       {layer === null ? (
         <p className="layer-inspector__empty">
-          Select a layer in the Layers panel to style, label, filter, configure its pop-up or its form.
+          Select a layer in the Layers panel to style, label, filter, configure its pop-up, its visible zooms or its form.
         </p>
       ) : (
         <>

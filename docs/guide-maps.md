@@ -48,9 +48,12 @@ The **Layers** panel is on the left; the top of the list draws on top.
 - The checkbox shows or hides a layer. **Move up**, **Move down** and **Remove from map** (×) change
   order and remove it.
 - Right-click a row, or choose its **Layer options** (⋯) button, for **Attribute Table**, **Zoom to**,
-  **Zoom to selected**, **Clear selection** and **Rename**. **Rename** changes the name on this map only;
-  **Reset to original name** undoes it.
-- A raster row has an opacity slider, a colormap list for single-band rasters, and **Zoom to**.
+  **Zoom to selected**, **Clear selection**, **Visible range** and **Rename**. **Visible range** and **Rename**
+  appear on maps you can change. **Rename** changes the name on this map only; **Reset to original name** undoes it.
+- A raster row has an opacity slider and a colormap list for single-band rasters. Its **Layer options** hold
+  **Zoom to** and **Visible range**.
+- A greyed name with a line such as **Shown from zoom 14** means the map is outside the layer's visible range: the
+  layer is still on, and draws again at the zooms the line names. Click the line to zoom there.
 - The pin keeps the panel open; unpinned, it folds to a **Layers** tab.
 
 A funnel on a row means the layer is filtered; a link mark means it is referenced from elsewhere.
@@ -58,7 +61,7 @@ A funnel on a row means the layer is filtered; a link mark means it is reference
 ## Use the layer inspector
 
 Click a layer's name in the Layers panel. The inspector opens on the right with **Style**, **Labels**,
-**Filter**, **Popup** and **Form** tabs; a dot marks a tab whose setting is in use. Click the name again,
+**Filter**, **Popup**, **Visibility** and **Form** tabs; a dot marks a tab whose setting is in use. Click the name again,
 or the inspector's ×, to clear the selection. With nothing selected the inspector folds to an
 **Inspector** tab; its pin holds it open for the session.
 
@@ -113,6 +116,30 @@ thumbnails or file chips; "+N more — view in details" and the **Details** icon
 3. Choose **Apply**. **Clear all** removes the filter.
 
 Up to 10 conditions; **is between** counts as two. The attribute table's filter is the same filter.
+
+## Set the zooms a layer is drawn at
+
+A layer can be drawn only between two zooms: parcels from street level in, for example, or city limits only when
+zoomed out. Leaving a busy layer off the zoomed-out view also keeps the map quick.
+
+1. Select the layer and open **Visibility**, or choose **Visible range** in its **Layer options** (⋯).
+2. Under **On this map**, keep **Use the layer's range**, or choose **Set a range for this map**.
+3. Drag the two ends of the slider, or pick each end from its list: named steps from **Region** to **Buildings**,
+   **Current map view**, or a zoom you type. Each step shows its approximate scale at the map's centre. **No limit**
+   leaves that end open.
+4. Choose **Apply**, and save the map to keep the range.
+
+The layer's owner or an administrator also sees **The layer's default**: the range every map uses unless it sets its
+own. **Save default** saves it on the layer straight away. A map's own range replaces the default as a whole, and may
+start further out than the default does; the panel warns that drawing the layer further out can be slow. A layer
+referenced from another service, and a raster, take only a map's own range.
+
+Outside its range a layer draws nothing and its labels are hidden. **Zoom to** lands where it is drawn, **Select
+features on the map** says when you need to zoom in or out to select from it, and an exported or printed map leaves
+it off the legend.
+
+The range changes what is drawn, not who can see the data: the attribute table, exports and the data itself are the
+same at any zoom. Don't rely on it to keep a layer from anyone.
 
 ## Save bookmarks
 
@@ -249,6 +276,7 @@ no link to the full record, which needs a sign-in.
 | "No basemap installed yet — an administrator can set one up in Admin ▸ Basemap." | Layers still display. Ask an administrator; the page is **Admin** → **Basemap** (`guide-imagery.md`). |
 | "This area is outside the downloaded basemap — an administrator can download it, or offer a streamed map, in Admin ▸ Basemap. Data layers still display." | Nothing is wrong with your layers. Pan back, switch to a streamed basemap if your portal lists one, or ask an administrator to download a larger area. |
 | "Your map is empty — choose “Add layers” at the top to put something on it." | Add a layer; **Save map** is disabled on an empty map. |
+| A layer is ticked but nothing draws, and its name is greyed with **Shown from zoom …** or **Shown up to zoom …** | The map is outside the layer's visible range. Click the line to zoom there, or change the range (**Set the zooms a layer is drawn at**). |
 | "… unavailable to you and was skipped." | A layer is not shared with you; ask its owner. |
 | "Could not open this map (HTTP 403)" or "(HTTP 404)" | The map is not shared with you or does not exist. |
 | "Save failed: …" | Read the reason, check you are still signed in, and save again. |

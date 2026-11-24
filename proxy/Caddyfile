@@ -94,6 +94,15 @@
 	}
 	header -Server
 
+	# Talus+ files and the Talus Field app are not for search results. The header ASKS search engines
+	# and code crawlers not to list these two paths;
+	# it changes nothing a browser or a phone does with them, and it does not stop a crawler fetching
+	# a file to draw a public page. A set-op in its own directive, applied in the request phase like
+	# the block above. On a Community install neither path holds anything and the header rides a 404
+	# or the portal's fallback page for an address nobody links.
+	@unlisted path /assets/plus/* /field /field/*
+	header @unlisted X-Robots-Tag "noindex"
+
 	# 9a: deployment runtime config — install.sh --edge writes proxy/config/config.json
 	# from .env, so ONE built SPA dist serves every hostname (the appliance's one-image
 	# model). no-store: an origin change takes effect on the next reload, never a stale

@@ -9,7 +9,10 @@ existing stored data valid (the V046 trigger accepts any DEFINED code, active or
 Resource is **`/custom-domains`** — named to steer clear of `GET /domains`, the retired built-ins'
 picklist endpoint (the same collision class as the slice-1 `/fields`→`/custom-fields` fix; the name
 outlives the collision so old clients can never conflate the two). Reads are org-wide (any
-authenticated user, for the picker + the edit form); writes are owner-or-admin, fail-closed. Lifecycle:
+authenticated user, for the picker + the edit form); the where-used listing names only layers the
+caller can view. **Creating** a domain needs the publisher or admin
+role, like every other create-a-catalog-item door: a domain is org-wide, shows in every picker and holds
+a unique name. Edits and deletes are owner-or-admin. All fail-closed. Lifecycle:
 a value still used by a feature can't be hard-deleted, and a domain still bound to a
 field can't be deleted (also enforced by the V046 FK) — surfaced as friendly 409s, never an orphan.
 """
@@ -24,7 +27,7 @@ from psycopg.rows import dict_row
 from pydantic import BaseModel, field_validator
 
 from ..auth import _validated_claims, get_current_user
-from ..authz import _has_admin_role
+from ..authz import _has_admin_role, _has_publish_role, _openfga_list_objects
 from ..db import get_db
 from ..models.user import User
 
@@ -110,6 +113,26 @@ class ValueUpdate(BaseModel):
 # --- gates -----------------------------------------------------------------------
 
 
+async def _require_publisher(
+    claims: dict | None = Depends(_validated_claims),
+    user: User = Depends(get_current_user),
+) -> User:
+    """Create gate: 403 unless the caller holds talus-publisher or talus-admin. Fails closed.
+
+    Being a layer's owner is not enough on its own: an owner without the role can still bind any
+    existing domain to their field, and asks a publisher or an admin for a new one."""
+    if not _has_publish_role(claims):
+        log.info(
+            "authz_rejected", capability="custom-domains:create",
+            reason="missing_publish_role", user_id=str(user.id),
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="not authorized to create domains; ask a publisher or an administrator",
+        )
+    return user
+
+
 async def _domain_owner(conn: AsyncConnection, domain_id: UUID) -> UUID:
     """The domain's owner id, or 404 if no such domain."""
     async with conn.cursor() as cur:
@@ -187,13 +210,21 @@ async def list_domains(
 
 @router.get(
     "/custom-domains/{domain_id}/usage",
-    summary="Where a domain is used — the fields/layers bound to it (for the management page)",
+    summary="Where a domain is used — the bound fields on layers the caller can view",
 )
 async def domain_usage(
     domain_id: UUID,
     conn: AsyncConnection = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
+    """The fields bound to a domain, each with its layer's id and title.
+
+    A domain is readable by every signed-in account; a layer is not. So a binding is listed only
+    when the caller can VIEW its layer — omitted otherwise, the rule every where-used listing
+    follows. An admin sees every binding. One list-objects call per
+    request (skipped for an admin and for a domain bound to nothing); if the authorization
+    service cannot answer, the helper raises 503 and nothing is named.
+    """
     async with conn.cursor(row_factory=dict_row) as cur:
         await cur.execute(
             "SELECT lf.layer_id, COALESCE(l.display_name, lf.layer_id) AS layer_name, "
@@ -203,6 +234,9 @@ async def domain_usage(
             (str(domain_id),),
         )
         rows = await cur.fetchall()
+    if rows and not user.is_admin:
+        viewable = set(await _openfga_list_objects(user.id, "can_view", "layer"))
+        rows = [r for r in rows if r["layer_id"] in viewable]
     return {
         "bindings": [
             {"layerId": r["layer_id"], "layerName": r["layer_name"],
@@ -233,11 +267,14 @@ async def get_domain(
     }
 
 
-@router.post("/custom-domains", status_code=status.HTTP_201_CREATED, summary="Create a domain (creator = owner)")
+@router.post(
+    "/custom-domains", status_code=status.HTTP_201_CREATED,
+    summary="Create a domain (publisher or admin; creator = owner)",
+)
 async def create_domain(
     payload: DomainCreate,
     conn: AsyncConnection = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(_require_publisher),
 ) -> dict[str, Any]:
     actor = str(user.id)
     try:

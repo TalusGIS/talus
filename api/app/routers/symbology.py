@@ -122,7 +122,16 @@ class Renderer(BaseModel):
     field: str | None = None
     stops: list[RendererStop] | None = None
     default: RendererDefault | None = None
-    minZoom: float | None = Field(default=None, ge=0, le=24)  # icon handover zoom (wired 2026-09-03)
+    # NOT a visibility setting: the zoom at which a POINT layer's icons take over from circles (wired
+    # 2026-09-03). The name predates the visible range below and is kept — stored renderers and Talus
+    # Field read it.
+    minZoom: float | None = Field(default=None, ge=0, le=24)
+    # The layer's DEFAULT visible range (decision-layer-zoom-range.md §3, §4.1): drawn from
+    # visibleMinZoom (inclusive) up to, not including, visibleMaxZoom — MapLibre's own rule. Either may be
+    # absent (no bound). A map's operationalLayers entry may set its own pair, which replaces this one as
+    # a pair (§3.1). Cartography only, never an access control (§11): the data stays readable at any zoom.
+    visibleMinZoom: float | None = Field(default=None, ge=0, le=24)
+    visibleMaxZoom: float | None = Field(default=None, ge=0, le=24)
     # c7 (decision-line-polygon-layers.md §8) — LAYER-WIDE geometry style, independent of simple/uniqueValue
     # (only colour varies by category). The map applies these per geometry; absent => today's defaults.
     # Line: width + optional dash. Polygon: fill opacity + outline colour/width. Ignored for point layers.
@@ -198,6 +207,12 @@ class Renderer(BaseModel):
                 raise ValueError("uniqueValue renderer requires `field`")
             if not self.stops:
                 raise ValueError("uniqueValue renderer requires at least one stop")
+        if (
+            self.visibleMinZoom is not None
+            and self.visibleMaxZoom is not None
+            and self.visibleMinZoom >= self.visibleMaxZoom
+        ):
+            raise ValueError("visibleMinZoom must be below visibleMaxZoom")
         return self
 
     def _style(self) -> dict[str, Any]:
@@ -211,6 +226,9 @@ class Renderer(BaseModel):
             # renderer shapes persist it — it lived only in the uniqueValue dict before, which
             # silently dropped it for simple renderers.
             "minZoom": self.minZoom,
+            # The layer's default visible range (decision-layer-zoom-range.md) — layer-wide, both shapes.
+            "visibleMinZoom": self.visibleMinZoom,
+            "visibleMaxZoom": self.visibleMaxZoom,
         }
         return {k: v for k, v in s.items() if v is not None}
 

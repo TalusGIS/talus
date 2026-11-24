@@ -91,7 +91,13 @@ export interface Renderer {
   field?: string | null
   stops?: RendererStop[] | null
   default?: { color: string; label?: string | null } | null
-  minZoom?: number | null // forward hook; no behavior yet
+  // NOT a visibility setting: the zoom at which a point layer's icons take over from circles
+  // (AssetMap iconHandoverZoom). The name predates the visible range below.
+  minZoom?: number | null
+  // The layer's DEFAULT visible range (decision-layer-zoom-range.md): drawn from visibleMinZoom
+  // (inclusive) up to, not including, visibleMaxZoom. A map's own pair replaces it (zoomRange.ts).
+  visibleMinZoom?: number | null
+  visibleMaxZoom?: number | null
   // c7 (decision-line-polygon-layers.md §8) — LAYER-WIDE geometry style (color varies by category, these
   // don't). Applied per geometry; absent => today's defaults. Line: width + dash. Polygon: fill + outline.
   lineWidth?: number | null

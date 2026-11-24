@@ -24,13 +24,15 @@ respectably, for decades.)
 
 - **Bug reports** — a reproducible bug report is the most valuable thing you can send.
   Include your deployment shape (compose profile, browser/client, layer type) and exact
-  steps. Email **`support@talusgis.com`** — this repository does not use GitHub Issues.
+  steps. Post it in **GitHub Discussions** (Q&A) or email **`support@talusgis.com`** — this
+  repository does not use GitHub Issues.
 - **Security reports** — please **do not** send suspected vulnerabilities to `support@`;
   see `SECURITY.md` for private disclosure (`security@talusgis.com`, or GitHub's private
   vulnerability reporting on this repository).
 - **Feature requests and use-case reports** — especially from municipal GIS practitioners.
   "Here is the workflow I do in ArcGIS Enterprise and how it maps (or doesn't) to Talus" is
-  exactly the input that steers the roadmap. Email `support@talusgis.com`.
+  exactly the input that steers the roadmap. Post it in **GitHub Discussions** (Ideas) or
+  email `support@talusgis.com`.
 - **Interop findings** — Talus speaks OGC API Features/WMTS/WCS and GeoServices to real
   desktop clients. If a client misbehaves against a Talus endpoint, a capture of the request
   pattern is gold.

@@ -38,6 +38,9 @@ export interface LayerPaneProps {
   onSelect?: (layerId: string) => void
   /** Layers with an active filter (handoff-map-2a §4) — passed to LayerToggle. */
   filteredIds?: Set<string>
+  /** Rows outside their visible zoom range (decision-layer-zoom-range.md §5) — passed to LayerToggle. */
+  rangeNotes?: Record<string, { text: string; canZoom: boolean }>
+  onZoomIntoRange?: (id: string) => void
 }
 
 export default function LayerPane(props: LayerPaneProps) {

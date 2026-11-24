@@ -191,6 +191,13 @@ class OperationalLayer(BaseModel):
     # never the layer item. Esri's webmap-spec field name for the same concept. Absent = the layer's
     # own name. Bookmark-name validation posture (shared _clean_label).
     title: str | None = None
+    # This map's OWN visible range for the layer (decision-layer-zoom-range.md §3.1): when either is set,
+    # the pair replaces the layer's default (its renderer's visibleMinZoom/visibleMaxZoom) as a whole;
+    # both absent = use the layer's default, live. Any kind may carry one — externals and rasters have no
+    # layer style, so this is their only range. Drawn from min (inclusive) up to, not including, max.
+    # Absent on every pre-range map, so they all still validate (jsonb, no migration).
+    visibleMinZoom: float | None = Field(default=None, ge=0.0, le=24.0)
+    visibleMaxZoom: float | None = Field(default=None, ge=0.0, le=24.0)
 
     @field_validator("title")
     @classmethod
@@ -210,6 +217,12 @@ class OperationalLayer(BaseModel):
                 raise ValueError("an external operational layer requires externalKind")
             if not self.url or not (self.url.startswith("https://") or self.url.startswith("http://")):
                 raise ValueError("an external operational layer requires an http(s) url")
+        if (
+            self.visibleMinZoom is not None
+            and self.visibleMaxZoom is not None
+            and self.visibleMinZoom >= self.visibleMaxZoom
+        ):
+            raise ValueError("visibleMinZoom must be below visibleMaxZoom")
         return self
 
 

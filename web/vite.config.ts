@@ -1,7 +1,7 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
@@ -22,9 +22,102 @@ import { VitePWA } from 'vite-plugin-pwa'
 // Bounded limit (by design, not a bug): the vector PMTiles basemap (range requests) and any
 // never-visited area are NOT cached — offline they show blank. The app degrades gracefully (no
 // scary "Map error" banner; an honest "Offline — viewing only" notice).
+//
+// Talus+ files. A Talus+ build compiles the
+// tree behind the '@paid' alias into this one dist. The rules below keep that code apart from the app
+// everyone downloads, and none of them knows what any paid module is:
+//   * every lazily loaded file that holds a module from the paid tree is written to assets/plus/,
+//     and so is the CSS such a file imports;
+//   * assets/plus/ is left out of the precache, so a browser fetches one of those files only when a
+//     page asks for it (and keeps it in a runtime cache afterwards);
+//   * each of those files starts with the notice the paid tree supplies, if it supplies one;
+//   * the paid code the app must load at start (the '@paid' entry and what it statically imports:
+//     route table, menu entries) stays in the app's own entry file, and the build FAILS if that
+//     grows past PAID_EAGER_CAP — so a paid page can never drift into what every visitor downloads.
+// In a Community build there is no paid tree: PAID_ENTRY does not exist and every rule matches nothing.
+const PAID_ROOT = fileURLToPath(new URL('../paid/web/', import.meta.url))
+const PAID_ENTRY = fileURLToPath(new URL('../paid/web/src/index.tsx', import.meta.url))
+const HAS_PAID = existsSync(PAID_ENTRY)
+const PAID_NOTICE_FILE = `${PAID_ROOT}file-notice.txt`
+const PAID_NOTICE = HAS_PAID && existsSync(PAID_NOTICE_FILE) ? readFileSync(PAID_NOTICE_FILE, 'utf8').trim() : ''
+const PLUS_DIR = 'assets/plus/'
+const PAID_EAGER_CAP = 24 * 1024 // bytes of rendered paid code allowed outside assets/plus/
+
+function fromPaid(id: string): boolean {
+  return HAS_PAID && id.startsWith(PAID_ROOT) && !id.includes('node_modules')
+}
+
+/** Where a JS file is written: assets/plus/ if it holds a paid module, else Vite's default. */
+function jsFileName(chunk: { moduleIds: string[] }): string {
+  return chunk.moduleIds.some(fromPaid) ? `${PLUS_DIR}[name]-[hash].js` : 'assets/[name]-[hash].js'
+}
+
+/** Put the paid tree's notice at the top of every JS and CSS file in assets/plus/. Done here, after
+ *  minification, and not with output.postBanner: a banner function that returns '' for the other
+ *  files still adds a blank line to each of them, and a Community build must come out unchanged. */
+function addPaidNotice(bundle: Record<string, { type: string; fileName: string; code?: string; source?: unknown }>): void {
+  if (!PAID_NOTICE) return
+  for (const file of Object.values(bundle)) {
+    if (!file.fileName.startsWith(PLUS_DIR)) continue
+    if (file.type === 'chunk') file.code = `${PAID_NOTICE}\n${file.code}`
+    else if (file.fileName.endsWith('.css')) file.source = `${PAID_NOTICE}\n${String(file.source)}`
+  }
+}
+
+/** The same notice for a web worker, which Vite bundles on its own (see `worker` below). */
+function paidWorkerNotice(): Plugin {
+  return {
+    name: 'talus-paid-worker-notice',
+    enforce: 'post',
+    generateBundle(_options, bundle) {
+      addPaidNotice(bundle)
+    },
+  }
+}
+
+// Names of the lazily loaded chunks that hold paid code, noted as their file names are chosen. Vite
+// names a chunk's CSS file after the chunk, so this is how assetFileNames sends that CSS after it.
+const paidChunkNames = new Set<string>()
+
+function paidFilesStayApart(): Plugin {
+  return {
+    name: 'talus-paid-files-stay-apart',
+    apply: 'build',
+    enforce: 'post',
+    generateBundle(_options, bundle) {
+      let eagerPaid = 0
+      for (const file of Object.values(bundle)) {
+        if (file.type !== 'chunk') continue
+        const inPlus = file.fileName.startsWith(PLUS_DIR)
+        if (inPlus) {
+          // The CSS a paid file imports must have followed it (the name rule above held).
+          const css = (file as { viteMetadata?: { importedCss?: Set<string> } }).viteMetadata?.importedCss ?? []
+          for (const name of css) {
+            if (!name.startsWith(PLUS_DIR)) this.error(`${name} is the CSS of a Talus+ file but is outside ${PLUS_DIR}`)
+          }
+          continue
+        }
+        for (const [id, mod] of Object.entries(file.modules)) {
+          if (fromPaid(id)) eagerPaid += mod.renderedLength
+        }
+      }
+      if (eagerPaid > PAID_EAGER_CAP) {
+        this.error(
+          `${eagerPaid} bytes of Talus+ code sit outside ${PLUS_DIR} (cap ${PAID_EAGER_CAP}): paid code is ` +
+            'statically imported from the paid entry and would reach every visitor. Load it with lazy() ' +
+            'instead.',
+        )
+      }
+      if (HAS_PAID) console.log(`[talus-plus] ${eagerPaid} bytes of paid start-up code in the app entry (cap ${PAID_EAGER_CAP})`)
+      addPaidNotice(bundle)
+    },
+  }
+}
+
 export default defineConfig({
   plugins: [
     react(),
+    paidFilesStayApart(),
     VitePWA({
       registerType: 'autoUpdate',
       // Offline is verified against the built app (`npm run build && npm run preview`); the SW stays
@@ -65,8 +158,31 @@ export default defineConfig({
         // Ditto the vendored basemap glyphs/sprites (decision-basemap-provisioning.md F8):
         // hundreds of small font-range .pbf files MapLibre fetches on demand — precaching them
         // all would bloat every install for ranges most maps never render.
-        globIgnores: ['**/*.pmtiles', 'basemaps-assets/**'],
+        // Ditto the Talus+ files (see PLUS_DIR above): fetched when a page asks for one, never ahead.
+        // Both Talus+ entries are added only when the paid tree is present, so a Community build's
+        // service worker is the same file it was before they existed.
+        globIgnores: ['**/*.pmtiles', 'basemaps-assets/**', ...(HAS_PAID ? [`${PLUS_DIR}**`] : [])],
         runtimeCaching: [
+          ...(HAS_PAID
+            ? [
+                {
+                  // Talus+ files, once a page has asked for one, so a paid page already opened
+                  // survives a blip. Served from the cache and refreshed behind it, NOT cache-first:
+                  // the edge answers a file that is not there yet with the portal page and 200, and
+                  // cache-first would keep that wrong answer for the whole expiry; this way the next
+                  // request puts it right. ★ The path is a LITERAL on purpose: workbox copies this
+                  // function into sw.js as text, where a constant from this file (PLUS_DIR) does
+                  // not exist.
+                  urlPattern: ({ url }: { url: URL }) => url.pathname.startsWith('/assets/plus/'),
+                  handler: 'StaleWhileRevalidate' as const,
+                  options: {
+                    cacheName: 'talus-plus-files',
+                    expiration: { maxEntries: 200, maxAgeSeconds: 30 * 24 * 3600 },
+                    cacheableResponse: { statuses: [200] },
+                  },
+                },
+              ]
+            : []),
           {
             // API vector feature tiles: /tiles/{layerId}/{z}/{x}/{y}.pbf (cross-origin API).
             urlPattern: ({ url }) => url.pathname.startsWith('/tiles/'),
@@ -112,6 +228,16 @@ export default defineConfig({
     chunkSizeWarningLimit: 1500,
     rollupOptions: {
       output: {
+        // Talus+ files go to their own folder, with their notice (see PLUS_DIR above). A Community
+        // build takes the second branch every time, which is Vite's default naming.
+        chunkFileNames: (chunk) => {
+          if (chunk.moduleIds.some(fromPaid)) paidChunkNames.add(chunk.name)
+          return jsFileName(chunk)
+        },
+        assetFileNames: (asset) =>
+          asset.names.some((n) => n.endsWith('.css') && paidChunkNames.has(n.slice(0, -4)))
+            ? `${PLUS_DIR}[name]-[hash][extname]`
+            : 'assets/[name]-[hash][extname]',
         // Code-splitting (2026-07-13): the app used to compile to ONE ~2.2 MB bundle that only
         // grew — it crossed workbox's 2 MiB precache default in July (build FAIL), and the 4 MiB
         // stopgap below just moved the treadmill. Split the eager bundle along its natural seams so
@@ -134,6 +260,14 @@ export default defineConfig({
           return
         },
       },
+    },
+  },
+  // A web worker is bundled on its own, outside the rules above, so it gets the same two: a worker
+  // built from the paid tree is written to assets/plus/ with the notice.
+  worker: {
+    plugins: () => [paidWorkerNotice()],
+    rollupOptions: {
+      output: { entryFileNames: jsFileName, chunkFileNames: jsFileName },
     },
   },
   resolve: {

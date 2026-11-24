@@ -24,6 +24,9 @@
 # bash 3.2-safe. Canonical read-only psql pattern; stdin fed /dev/null so a compose exec
 # never steals it.
 set -u
+# `docker compose` finds the stack by the directory it runs in, so go to the repo root first:
+# started from anywhere else this test read "service postgres is not running" as its answers.
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"; cd "$ROOT" || { echo "inv06: FAIL — cd"; exit 2; }
 
 DB_ROLE="${DB_ROLE:-talus_app}"
 PSQL="docker compose exec -T postgres psql -U talus -d talusgis -tA"

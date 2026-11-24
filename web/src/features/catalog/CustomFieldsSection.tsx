@@ -34,6 +34,7 @@ import type {
   SchemaImportResult,
   SchemaImportStatus,
 } from '@/lib/api'
+import { useIsPublisher } from '@/lib/auth/roles'
 import { GNSS_BUNDLE, gnssBundleDrafts } from '@/lib/gnssBundle'
 
 /**
@@ -807,6 +808,12 @@ export const AddFieldForm = forwardRef<
   const [defaultRaw, setDefaultRaw] = useState('')
   const [rules, setRules] = useState<RuleDraft>(EMPTY_RULES)
   const [domainMode, setDomainMode] = useState<'existing' | 'new'>('existing')
+  // Creating a picklist needs the publisher or admin role (the API enforces). A layer owner without
+  // it picks an existing one — so "Create new" is not offered, rather than offered and refused.
+  const canCreateDomain = useIsPublisher()
+  // The mode in force: one value for the render, the ready check and the submit, so the three cannot
+  // disagree if the role is lost while the form is open.
+  const mode = canCreateDomain ? domainMode : 'existing'
   const [selDomainId, setSelDomainId] = useState('')
   const [newDomainName, setNewDomainName] = useState('')
   const [newValues, setNewValues] = useState<DraftValue[]>([{ code: '', label: '' }])
@@ -817,7 +824,7 @@ export const AddFieldForm = forwardRef<
   const keyValid = KEY_RE.test(fieldKey)
   const codedReady =
     dataType !== 'coded' ||
-    (domainMode === 'existing'
+    (mode === 'existing'
       ? selDomainId !== ''
       : newDomainName.trim() !== '' && newValues.some((v) => v.code.trim() && v.label.trim()))
   const advancedPatternMissing = uiType === 'text' && uiFormat === 'advanced' && rules.patternCustom.trim() === ''
@@ -849,7 +856,7 @@ export const AddFieldForm = forwardRef<
     try {
       let domainId: string | undefined
       if (dataType === 'coded') {
-        if (domainMode === 'existing') {
+        if (mode === 'existing') {
           domainId = selDomainId
         } else {
           const created = await createCustomDomain(
@@ -988,15 +995,21 @@ export const AddFieldForm = forwardRef<
       {dataType === 'coded' && (
         <div className="sign-form__field">
           <span>Picklist values *</span>
-          <div className="cf-domain__modes">
-            <label>
-              <input type="radio" name="domainmode" checked={domainMode === 'existing'} onChange={() => setDomainMode('existing')} /> Use existing
-            </label>
-            <label>
-              <input type="radio" name="domainmode" checked={domainMode === 'new'} onChange={() => setDomainMode('new')} /> Create new
-            </label>
-          </div>
-          {domainMode === 'existing' ? (
+          {canCreateDomain ? (
+            <div className="cf-domain__modes">
+              <label>
+                <input type="radio" name="domainmode" checked={domainMode === 'existing'} onChange={() => setDomainMode('existing')} /> Use existing
+              </label>
+              <label>
+                <input type="radio" name="domainmode" checked={domainMode === 'new'} onChange={() => setDomainMode('new')} /> Create new
+              </label>
+            </div>
+          ) : (
+            <p className="modal__muted">
+              Choose an existing picklist. A publisher or an administrator can add a new one on the Domains page.
+            </p>
+          )}
+          {mode === 'existing' ? (
             <select value={selDomainId} onChange={(e) => setSelDomainId(e.target.value)}>
               <option value="">— choose a domain —</option>
               {domains.map((d) => (

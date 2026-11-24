@@ -1766,6 +1766,12 @@ export interface WebMapOperationalLayer {
   /** Map-only display-name override (decision-map-rename.md): renames the layer ON THIS MAP only —
    *  never the layer item. Absent = the layer's own name. */
   title?: string
+  /** This map's OWN visible range for the layer (decision-layer-zoom-range.md §3.1): when either end
+   *  is set the pair replaces the layer's default as a whole; both absent = use the layer's default.
+   *  Any kind. Written only when set, so pre-range maps stay byte-identical; the server echoes an
+   *  unset end as null. */
+  visibleMinZoom?: number | null
+  visibleMaxZoom?: number | null
 }
 
 /** The saved viewport — center [lon, lat] + zoom (what MapLibre exposes natively). */

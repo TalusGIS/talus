@@ -1610,6 +1610,10 @@ body .maplibregl-map {
   color: var(--text-muted);
 }
 
+.dm-card__disclaimer {
+  margin-top: 8px;
+}
+
 .dm-values {
   display: flex;
   flex-direction: column;
@@ -2491,19 +2495,28 @@ body .maplibregl-map {
   color: var(--color-text);
 }
 
+/* Six tabs since Visibility joined (decision-layer-zoom-range.md §4.3) — tighter padding so they fit the
+   320px column, and a sideways scroll rather than a clipped Form tab if the configured dots push it over. */
 .layer-inspector__tabs {
   display: flex;
-  gap: 2px;
-  padding: 0 0.6rem;
+  gap: 0;
+  padding: 0 0.4rem;
   border-bottom: 1px solid var(--border-subtle);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.layer-inspector__tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .layer-inspector__tab {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
+  position: relative; /* the configured dot sits on the corner, taking no width */
+  flex-shrink: 0;
   height: 32px;
-  padding: 0 0.55rem;
+  padding: 0 0.36rem;
   font-size: 0.82rem;
   font-weight: 600;
   color: var(--color-muted);
@@ -2528,6 +2541,11 @@ body .maplibregl-map {
   height: 6px;
   border-radius: 50%;
   background: var(--accent);
+}
+.layer-inspector__tab .layer-inspector__dot {
+  position: absolute;
+  top: 6px;
+  right: 0;
 }
 
 .layer-inspector__body {
@@ -3006,6 +3024,41 @@ img.catalog__thumb {
 
 .layer-toggle__legend-item--muted {
   opacity: 0.7;
+}
+
+/* Out of the layer's visible zoom range (decision-layer-zoom-range.md §5): the name and legend grey,
+   the tick box and actions keep their colour, and a short line under the name says where it is drawn. */
+.layer-toggle__layer.is-out-of-range .layer-toggle__name,
+.layer-toggle__layer.is-out-of-range .layer-toggle__item > span:not(.layer-toggle__swatch),
+.layer-toggle__layer.is-out-of-range .layer-toggle__legend-item {
+  color: var(--text-muted);
+}
+
+.layer-toggle__layer.is-out-of-range .layer-toggle__swatch {
+  opacity: 0.45;
+}
+
+.layer-toggle__range {
+  align-self: flex-start;
+  margin: -0.1rem 0 0 1.45rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-align: left;
+}
+
+button.layer-toggle__range {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+}
+
+button.layer-toggle__range:hover {
+  color: var(--text-brand);
 }
 
 /* Sign popup (rendered as HTML inside a MapLibre popup) */
@@ -4302,6 +4355,147 @@ img.catalog__thumb {
 .labels-panel__remove {
   margin-right: auto; /* push Remove left, Cancel/Apply right — the destructive action stands apart */
   color: var(--danger-600);
+}
+
+/* Visibility tab (decision-layer-zoom-range.md §4.2) — a two-ended zoom slider (two native range inputs
+   laid over one track, so each thumb keeps its own keyboard and screen-reader handling) and a picker per
+   end. Shares the styles-panel shell. */
+.visibility-panel__now {
+  margin: 0 0 0.6rem;
+  font-size: 0.82rem;
+}
+.visibility-panel__now.is-out {
+  color: var(--warning-600);
+}
+.visibility-panel__section {
+  padding-top: 0.6rem;
+  margin-bottom: 0.6rem;
+  border-top: 1px solid var(--border-subtle);
+}
+.visibility-panel__section .sign-form__actions {
+  margin-top: 0.5rem;
+}
+.visibility-panel__heading {
+  margin: 0 0 0.4rem;
+  font-size: 0.85rem;
+}
+.visibility-panel__section .styles-panel__radio {
+  margin-bottom: 0.3rem;
+}
+.visibility-panel__editor {
+  border: 0;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  min-width: 0;
+}
+.visibility-panel__editor:disabled {
+  opacity: 0.6;
+}
+.visibility-panel__slider {
+  position: relative;
+  height: 2.4rem;
+  margin: 0 0.5rem 0.4rem;
+}
+.visibility-panel__track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0.55rem;
+  height: 0.3rem;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-default);
+}
+.visibility-panel__fill {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  border-radius: 999px;
+  background: var(--brand);
+}
+.visibility-panel__tick {
+  position: absolute;
+  top: 0.45rem;
+  width: 1px;
+  height: 0.35rem;
+  background: var(--text-subtle);
+}
+.visibility-panel__here {
+  position: absolute;
+  top: -0.45rem;
+  width: 2px;
+  height: 1.2rem;
+  margin-left: -1px;
+  background: var(--accent);
+}
+.visibility-panel__slider input[type='range'] {
+  position: absolute;
+  left: -0.5rem;
+  right: -0.5rem;
+  top: 0;
+  width: calc(100% + 1rem);
+  margin: 0;
+  height: 1.4rem;
+  background: none;
+  pointer-events: none;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.visibility-panel__slider input[type='range']::-webkit-slider-runnable-track {
+  background: none;
+}
+.visibility-panel__slider input[type='range']::-moz-range-track {
+  background: none;
+}
+.visibility-panel__slider input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  pointer-events: auto;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: var(--surface-card);
+  border: 2px solid var(--brand);
+  cursor: pointer;
+}
+.visibility-panel__slider input[type='range']::-moz-range-thumb {
+  pointer-events: auto;
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 50%;
+  background: var(--surface-card);
+  border: 2px solid var(--brand);
+  cursor: pointer;
+}
+.visibility-panel__slider input[type='range']:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.visibility-panel__scale-ends {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+.visibility-panel__end {
+  display: grid;
+  grid-template-columns: 4.5rem 1fr 4rem;
+  gap: 0.4rem;
+  align-items: center;
+  margin-bottom: 0.4rem;
+  font-size: 0.82rem;
+}
+.visibility-panel__end select,
+.visibility-panel__end input {
+  min-width: 0;
+}
+.visibility-panel__warn {
+  margin: 0.3rem 0 0;
+  font-size: 0.8rem;
+  color: var(--warning-600);
 }
 
 /* Pop-ups panel (decision-map-popups.md) — enable toggle + title pick + ordered field checklist. */
@@ -6343,7 +6537,9 @@ img.catalog__thumb {
   left: 50%;
   transform: translateX(-50%);
   z-index: 3; /* the EditToolbar slot's stacking — above the left dock, like .edit-toolbar */
-  width: 15.5rem;
+  /* 18rem, not 15.5: three icon+label tool buttons need ~15.5rem of CONTENT width, and
+     .map__panel's 1rem padding + overflow-x: hidden clipped "Polygon" at the old width. */
+  width: 18rem;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
