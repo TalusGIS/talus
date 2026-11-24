@@ -3,6 +3,46 @@
 All notable changes to Talus GIS are documented here. Versions follow semantic
 versioning; entries describe the product surface, not internal development history.
 
+## v1.1.0 (2026-11-24)
+
+Layers can be set to draw only at the zooms you choose. This release also tightens two picklist permissions and
+fixes the map's scale readout. **A new api image. No database migration.**
+
+### ★ Read before upgrading
+
+- **Upgrade by the standard procedure** in `docs/upgrade-runbook.md`, from 1.0.0. Take the `pg_dump -Fc` its first
+  step asks for.
+- **Talus+ needs the 1.1.0 bundle.** The 1.0.0 bundle is refused.
+- **Creating a picklist now needs the publisher or administrator role** (see Changed).
+
+### Added
+
+- **Visible range.** A layer can be drawn only between two zooms. Its owner or an administrator sets a default on the
+  layer; anyone who can edit a map can give that map its own range, which replaces the layer's. Set it from the new
+  **Visibility** tab in the layer inspector or **Visible range** in the layer's ⋯ menu, with named steps from Region to
+  Buildings and the approximate scale at the map's centre. Outside its range a layer draws nothing and asks for none of
+  its tiles, so a zoomed-out view of a large layer, such as a county's parcels, stays quick. The Layers panel greys
+  the layer and says "Shown from zoom 14"; click that line to zoom in. **Zoom to** lands where the layer is drawn,
+  and the printed legend leaves out layers that are not drawn. The range changes the drawing only: the table, export
+  and the data are the same at any zoom, and it is not an access control.
+- **Raster layers have the layer menu**, with **Zoom to** and **Visible range**.
+
+### Changed
+
+- **Creating a picklist (a domain) needs the publisher or administrator role**, like creating any other item.
+  Before, any signed-in account could create one. Using existing picklists is unchanged.
+- **A picklist's Used by list names only the layers you can view**; an administrator still sees all of them. Before,
+  any signed-in account could see the name of every layer that used a picklist.
+- **Questions, bug reports and suggestions** can go to GitHub Discussions as well as by email. Security reports still
+  go to `security@talusgis.com`, never to Discussions.
+- **Talus+ browser files are kept apart from the core app** and are fetched only when a page uses them. Search
+  engines are asked not to list them or the Talus Field app.
+
+### Fixed
+
+- **The map's status bar shows the true scale.** It read twice the real figure.
+- **The Sketch toolbar's Polygon button is no longer cut off.**
+
 ## v1.0.0 (2026-11-15)
 
 Talus 1.0. The core is complete and validated against real municipal data; it ships as versioned releases with
