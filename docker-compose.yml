@@ -121,7 +121,7 @@ services:
 
   api:
     logging: *default-logging
-    image: ghcr.io/talusgis/talus-api:v1.1.0
+    image: ghcr.io/talusgis/talus-api@sha256:d0f80f452c4c13335d7f59d445f9871ac0b026d4e3b7814ea3fbc17fbb9bd469
     container_name: talusgis-api
     depends_on:
       postgres:
