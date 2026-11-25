@@ -13,6 +13,13 @@ for feature. The goal is a GIS that is easy to run and costs little to own.
 The core is free and open source. A paid edition, Talus+, adds support and a few extra modules (see
 [the two editions](#the-two-editions) below).
 
+## Try it first
+
+There's a live demo at [demo.talusgis.com](https://demo.talusgis.com/). It's a real Talus Community server loaded with
+a Florida county's open data. You can look at the maps without an account, or sign in with the shared login shown on
+its front page to edit two practice layers. That login can't upload data or create layers, and everything you change is
+erased at 3 a.m. Eastern each night. Talus+ isn't installed on it.
+
 ## Where it stands
 
 This is version 1.0. It has been tested on real municipal data: more than 12,000 signs, over 300,000 address points,

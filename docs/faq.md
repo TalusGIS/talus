@@ -96,6 +96,11 @@ own install.
 
 ## Deployment and scale
 
+**Can I try it without installing?** Yes. [demo.talusgis.com](https://demo.talusgis.com/) is a live Talus Community
+server with a Florida county's open data on it. Browse the maps without an account, or sign in with the shared login
+on its front page to edit two practice layers. That login cannot upload data or create layers, so to try Talus with
+your own data, install it. Edits are erased every night at 3 a.m. Eastern.
+
 **What does it take to run?** One host with Docker. One script (`scripts/talus-setup.sh`) installs the whole
 stack — the portal, database, identity, authorization, tiles, and TLS edge — where the closed
 alternative needs several separately installed components. A modest machine — 4 vCPUs and 8 GB — serves a
