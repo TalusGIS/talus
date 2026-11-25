@@ -118,6 +118,7 @@ import {
   type ZoomPair,
   type ZoomRange,
 } from '@/features/map/zoomRange'
+import { IDENTIFY_TOLERANCE_PX, keepIdentifyHits } from '@/features/map/identifyHits'
 import useConfirm from '@/components/useConfirm'
 import LabelsPanel, { LABEL_DEFAULTS } from '@/features/map/LabelsPanel'
 import PopupsPanel from '@/features/map/PopupsPanel'
@@ -634,7 +635,9 @@ export interface FeatureHit {
 // multiple render layers (polygon fill+outline, line stroke+hit, view fill+line+circle) and repeats across
 // tile splits. queryRenderedFeatures returns topmost-first, so the first occurrence wins and the result
 // order = draw order (top layer first), matching the ESRI pager. A small pixel box (not a bare point) makes
-// thin points/lines easy to hit; layers absent from the map are filtered out so the query never throws.
+// thin points/lines easy to hit; a POLYGON must be under the click itself, or a click inside one parcel
+// would also return its neighbours (identifyHits.ts has the rule and its tests). Layers absent from the
+// map are filtered out so the query never throws.
 function collectFeatureHits(
   map: maplibregl.Map,
   point: { x: number; y: number },
@@ -642,28 +645,40 @@ function collectFeatureHits(
 ): FeatureHit[] {
   const ids = Object.keys(renderLayerToDef).filter((lid) => map.getLayer(lid))
   if (ids.length === 0) return []
-  const tol = 5
+  const tol = IDENTIFY_TOLERANCE_PX
   const box: [[number, number], [number, number]] = [
     [point.x - tol, point.y - tol],
     [point.x + tol, point.y + tol],
   ]
-  const seen = new Set<string>()
-  const hits: FeatureHit[] = []
-  for (const f of map.queryRenderedFeatures(box, { layers: ids })) {
+  const keyOf = (f: maplibregl.MapGeoJSONFeature): string | null => {
     const defId = renderLayerToDef[f.layer.id]
     const featureId = f.properties?.id
-    if (!defId || typeof featureId !== 'string') continue
-    const key = `${defId}:${featureId}`
-    if (seen.has(key)) continue
-    seen.add(key)
-    hits.push({
-      defId,
-      featureId,
+    return defId && typeof featureId === 'string' ? `${defId}:${featureId}` : null
+  }
+  const keysAtPoint = new Set<string>()
+  for (const f of map.queryRenderedFeatures([point.x, point.y], { layers: ids })) {
+    const key = keyOf(f)
+    if (key) keysAtPoint.add(key)
+  }
+  const inBox: (FeatureHit & { key: string; geometryType: string })[] = []
+  for (const f of map.queryRenderedFeatures(box, { layers: ids })) {
+    const key = keyOf(f)
+    if (!key) continue
+    inBox.push({
+      key,
+      geometryType: f.geometry.type,
+      defId: renderLayerToDef[f.layer.id],
+      featureId: f.properties!.id as string,
       props: (f.properties ?? {}) as Record<string, unknown>,
       geometry: f.geometry,
     })
   }
-  return hits
+  return keepIdentifyHits(inBox, keysAtPoint).map(({ defId, featureId, props, geometry }) => ({
+    defId,
+    featureId,
+    props,
+    geometry,
+  }))
 }
 
 // Active-feature highlight (c4, decision-multi-layer-popup.md): a bright halo over the currently-paged

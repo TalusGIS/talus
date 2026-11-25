@@ -2618,14 +2618,26 @@ body .maplibregl-map {
 .layer-pane {
   /* Positioned by .map__leftdock now (controls dock, Talus 20); flows in its column. */
   align-self: stretch;
+  /* May shrink to the dock's height limit; the panel below then scrolls. */
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .layer-pane__panel {
-  padding: 0.4rem 0.6rem 0.55rem;
+  /* No top padding: the header carries it, so the header can stay put while the list scrolls. */
+  padding: 0 0.6rem 0.55rem;
   background: var(--surface-card);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
   min-width: 11rem;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* Room for the scrollbar is always kept, so the row buttons at the right edge are never under it
+     and the panel does not change width when the list grows long enough to scroll. */
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
 }
 
 /* Raster rows in the unified TOC (V045+): a distinct swatch + an inline opacity slider. */
@@ -2773,7 +2785,12 @@ img.catalog__thumb {
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  margin-bottom: 0.35rem;
+  /* Stays at the top of the panel while the list scrolls, so the pin is always in reach. */
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 0.4rem 0 0.35rem;
+  background: var(--surface-card);
 }
 
 /* Section labels at the 11px dense-data floor (handoff-map-2a §4, E9). */
@@ -2975,6 +2992,26 @@ img.catalog__thumb {
 .layer-toggle__swatch--geom.layer-toggle__swatch--btn:hover {
   background: var(--surface-hover, rgba(127, 127, 127, 0.16));
   box-shadow: 0 0 0 2px var(--accent);
+}
+
+/* Show or hide a layer's legend: sits where a single-symbol layer has its swatch, and is the same size. */
+.layer-toggle__legend-caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 1.05rem;
+  height: 1.05rem;
+  padding: 0;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-radius: 0.2rem;
+  cursor: pointer;
+}
+.layer-toggle__legend-caret:hover {
+  color: var(--text-body);
+  background: var(--surface-hover, rgba(127, 127, 127, 0.16));
 }
 
 /* Per-layer legend (read-only) nested under a uniqueValue layer row */
@@ -3261,6 +3298,13 @@ button.layer-toggle__range:hover {
   flex-direction: column;
   align-items: flex-start;
   gap: 0.5rem;
+  /* The dock never outgrows the map. Without a limit a long layer list (one layer drawn by 40 values
+     is 40 legend rows) ran past the map and made the whole page scroll;
+     the Layers panel inside now scrolls instead. It stops above what sits at the bottom left:
+     the status strip (28px), then the address-search button (.geocode-search: 0.6rem above the strip,
+     1.9rem tall), then a 0.5rem gap. With its own 0.75rem at the top that is 3.75rem + 28px.
+     A height limit, not `bottom`, so a short list leaves the map below it clickable. */
+  max-height: calc(100% - 3.75rem - 28px);
 }
 
 .map__tools {

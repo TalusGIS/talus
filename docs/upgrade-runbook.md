@@ -64,6 +64,13 @@ A normal upgrade takes **well under a minute** of installer time; the backup is 
 
 ## Per-version notes
 
+### Upgrading to v1.1.1
+
+- **From 1.1.0, by the standard procedure above.** No database migration.
+- **Talus+ needs the 1.1.1 bundle.** Apply it as step 2 of **Talus+ installs** below; the 1.1.0 bundle is refused.
+- **No manual edge step.** From this release the installer recreates the edge itself, so the extra command in the
+  v1.1.0 note is not needed.
+
 ### Upgrading to v1.1.0
 
 - **From 1.0.0, by the standard procedure above.** No database migration; the upgrade pulls a new api image.

@@ -109,6 +109,12 @@ export default function TableView({
   const ops = editOpsOf(layer)
   const auth = useAuth()
   const token = auth.user?.access_token
+  // Signed out is a real state here, not a wait: the map shows a public map to a visitor with no
+  // login, and its layer menu offers this table. The grid used
+  // to wait for a token before reading anything, so a visitor saw "Loading…" for ever. Now it reads
+  // once sign-in has settled either way, sending the token when there is one. A visitor gets the
+  // rows the server gives the public, read-only: no export here, no star, pick-list codes shown raw.
+  const authSettled = !auth.isLoading
 
   const [columns, setColumns] = useState<LayerColumn[] | null>(null)
   // Display field (decision-layer-display-field.md): the RAW starred column (null = unset → the map derives a
@@ -186,14 +192,17 @@ export default function TableView({
   // Metadata: columns + coded picklists. Loaded once per layer; seeds the filter cards + pinned
   // remainder from the layer's current map filter (filter-sync).
   useEffect(() => {
-    if (!token) return
+    if (!authSettled) return
     let active = true
     setColumns(null)
     setError(null)
     Promise.all([
       fetchLayerColumns(layer.id, token),
       // Never block the grid on the star state — degrade to "no star" if it fails (e.g. unprovisioned layer).
-      fetchLayerDisplayField(layer.id, token).catch(() => ({ displayField: null, canManage: false })),
+      // Signed out there is no star to read: that door is for signed-in callers only.
+      token
+        ? fetchLayerDisplayField(layer.id, token).catch(() => ({ displayField: null, canManage: false }))
+        : Promise.resolve({ displayField: null, canManage: false }),
     ])
       .then(([cols, df]) => {
         if (!active) return
@@ -202,9 +211,12 @@ export default function TableView({
         setCanManageDisplay(df.canManage)
         // Coded owner fields: load each bound custom domain's values (labels + filter options).
         setCustomDomains({})
-        const domainIds = [...new Set(cols.columns.map((c) => c.customDomain).filter((d): d is string => !!d))]
+        // Signed out, pick-list values are not public (the door is signed-in only): raw codes render.
+        const domainIds = token
+          ? [...new Set(cols.columns.map((c) => c.customDomain).filter((d): d is string => !!d))]
+          : []
         for (const id of domainIds) {
-          getCustomDomain(id, token)
+          getCustomDomain(id, token as string)
             .then((d) => active && setCustomDomains((prev) => ({ ...prev, [id]: d.values })))
             .catch(() => {
               /* raw codes render for this domain's fields */
@@ -230,7 +242,7 @@ export default function TableView({
     return () => {
       active = false
     }
-  }, [layer.id, token])
+  }, [layer.id, token, authSettled])
 
   // Panel↔table co-edit (the filter-sync remainder): when the layer's shared filter changes
   // EXTERNALLY — the funnel FilterPanel applied while this table is open — reseed the cards, the
@@ -278,7 +290,7 @@ export default function TableView({
   }, [layer.id, filterStrings, bboxString, reloadKey])
 
   useEffect(() => {
-    if (!token || !columns) return
+    if (!authSettled || !columns) return
     const scoped = showSelectedOnly && selected.size > 0
     const ctrl = new AbortController()
     const handle = setTimeout(() => {
@@ -315,7 +327,7 @@ export default function TableView({
     // selectedIdsKey stands in for (showSelectedOnly, selected-membership) — '' while the mode is
     // off — so listing those two directly would re-fetch on every checkbox toggle for nothing.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layer.id, token, columns, filterStrings, sortString, bboxString, selectedIdsKey, offset, pageSize, reloadKey])
+  }, [layer.id, token, authSettled, columns, filterStrings, sortString, bboxString, selectedIdsKey, offset, pageSize, reloadKey])
 
   // code -> label maps, keyed by built-in domain table AND custom-domain id (one lookup in cell()).
   const customLabels = useMemo(() => {
@@ -510,7 +522,8 @@ export default function TableView({
           {selected.size === 0 ? ` · ${featLabel}` : ''}
           {loading ? ' · …' : ''}
         </span>
-        <div className="dtable__export">
+        {/* Export is for signed-in users here. A visitor downloads public data from the Open Data page. */}
+        {token && <div className="dtable__export">
           <button
             className="btn btn--sm dtable__export-btn"
             onClick={() => setShowExport((v) => !v)}
@@ -579,7 +592,7 @@ export default function TableView({
               )}
             </div>
           )}
-        </div>
+        </div>}
       </div>
 
       {showCols && (

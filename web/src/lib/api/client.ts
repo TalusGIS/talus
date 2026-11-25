@@ -1070,16 +1070,22 @@ export async function fetchPublicSlotFeature(
   return feature
 }
 
-/** GET /layers/{id}/features — server-side filter/sort/paginate; OGC numberMatched/Returned. */
+/** GET /layers/{id}/features — server-side filter/sort/paginate; OGC numberMatched/Returned.
+ *  The token is optional, as it is for the columns read above: the server answers a signed-out
+ *  caller for a layer that is shared publicly and refuses every other layer. With no token the
+ *  header is left out (an empty Bearer would be refused). */
 export async function queryLayerFeatures(
   layerId: string,
   params: LayerQuery,
-  accessToken: string,
+  accessToken?: string | null,
   signal?: AbortSignal,
 ): Promise<LayerFeatureCollection> {
   const q = layerQueryParams(params)
   const res = await fetch(`${API_BASE_URL}/layers/${encodeURIComponent(layerId)}/features?${q}`, {
-    headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+    headers: {
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      Accept: 'application/json',
+    },
     signal,
   })
   if (!res.ok) throw new ApiError(res.status, await errorDetail(res))

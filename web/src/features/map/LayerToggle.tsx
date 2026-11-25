@@ -1,6 +1,7 @@
-import type { MouseEvent, ReactNode } from 'react'
+import { useState, type MouseEvent, type ReactNode } from 'react'
 import { ChevronDown, ChevronUp, Crosshair, Download, Ellipsis, Funnel, X } from 'lucide-react'
 
+import Caret from '@/components/Caret'
 import { GeometryIcon, LinkIcon } from '@/features/catalog/ItemTypeIcons'
 import type { LayerConfig } from '@/features/map/types'
 import { symbolByName } from '@/features/map/pointIcons'
@@ -47,6 +48,11 @@ export const RASTER_COLORMAPS: { value: string; label: string }[] = [
   { value: 'spectral', label: 'Spectral' },
   { value: 'terrain', label: 'Terrain' },
 ]
+
+/** A legend with more rows than this starts hidden: a layer drawn
+ *  by 40 values would otherwise push every layer under it out of sight. The reader opens it with the
+ *  caret on the layer's row. A shorter legend starts shown, as it always was. */
+const LEGEND_STARTS_SHOWN_UP_TO = 12
 
 export interface LayerToggleProps {
   items: TocItem[]
@@ -101,6 +107,9 @@ export default function LayerToggle({
   rangeNotes,
   onZoomIntoRange,
 }: LayerToggleProps) {
+  // Legends the reader has shown or hidden by hand, by layer id. Absent = the starting rule above.
+  // Kept for this visit only: it is not saved with the map.
+  const [legendShown, setLegendShown] = useState<Record<string, boolean>>({})
   if (items.length === 0) return null
   // The sketch row (always items[0] when present) is not reorderable and not in the draw-order
   // array, so the first/last arrow-disable indices count REAL rows only.
@@ -386,6 +395,8 @@ export default function LayerToggle({
             </span>
           )
 
+        const legendRows = stops.length + (r?.default ? 1 : 0)
+        const legendOpen = legendShown[c.id] ?? legendRows <= LEGEND_STARTS_SHOWN_UP_TO
         const openMenu = menuHandler(c.id)
         const kebab = kebabFor(c.id, c.label)
 
@@ -402,6 +413,21 @@ export default function LayerToggle({
                   onChange={(e) => onToggle(c.id, e.target.checked)}
                 />
                 {!isUnique && swatch(rowColor)}
+                {isUnique && (
+                  <button
+                    type="button"
+                    className="layer-toggle__legend-caret"
+                    aria-expanded={legendOpen}
+                    aria-label={`${legendOpen ? 'Hide' : 'Show'} the legend for ${c.label}`}
+                    title={legendOpen ? 'Hide the legend' : `Show the legend (${legendRows} values)`}
+                    onClick={(e) => {
+                      e.preventDefault() // inside the row's label: never the checkbox toggle
+                      setLegendShown((prev) => ({ ...prev, [c.id]: !legendOpen }))
+                    }}
+                  >
+                    <Caret open={legendOpen} size={13} />
+                  </button>
+                )}
                 {onSelect ? (
                   <button
                     type="button"
@@ -432,7 +458,7 @@ export default function LayerToggle({
               {actions(c.id, c.label, i - sketchOffset, kebab, !onOpenMenu)}
             </div>
             {rangeLine(c.id, c.label)}
-            {isUnique && (
+            {isUnique && legendOpen && (
               <ul className="layer-toggle__legend">
                 {stops.map((s) => (
                   <li className="layer-toggle__legend-item" key={s.value}>

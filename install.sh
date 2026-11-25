@@ -468,7 +468,12 @@ echo "  API healthy (boot guard passed)."
 # --- edge front --------------------------------------------------------------------
 if [ "$EDGE" -eq 1 ]; then
   say "Edge: Caddy TLS front (serves the SPA, proxies api + keycloak)"
-  docker compose --profile edge up -d caddy
+  # ALWAYS --force-recreate (decision-installer-edge-recreate.md): the Caddyfile is a single-file
+  # bind mount, which follows the file's inode, and an upgrade's rsync or checkout writes a new
+  # inode. A plain `up -d` leaves a running edge on the OLD file, so a release's edge changes
+  # (headers, CSP, routes) never reach an upgraded box. On a first install nothing is running and
+  # this is the same as `up -d`; certificates live in the caddydata volume, so none is re-issued.
+  docker compose --profile edge up -d --force-recreate caddy
 fi
 
 # --- clean finish --------------------------------------------------------------------
