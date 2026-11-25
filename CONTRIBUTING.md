@@ -5,7 +5,7 @@ anything, because our contribution model is deliberately unusual.
 
 ## Talus does not accept outside code contributions
 
-Talus is **solo-maintained by design**. Every capability in this codebase went through a
+Talus is **maintained by one person today**, and takes no outside code by design. Every capability in this codebase went through a
 written design decision before a line of code was written, ships with its own verification
 sweep and security negative-tests, and is built against a deliberately narrow product thesis
 (see the README). That discipline — one owner, decision-doc-before-code, a security review of
@@ -24,8 +24,7 @@ respectably, for decades.)
 
 - **Bug reports** — a reproducible bug report is the most valuable thing you can send.
   Include your deployment shape (compose profile, browser/client, layer type) and exact
-  steps. Post it in **GitHub Discussions** (Q&A) or email **`support@talusgis.com`** — this
-  repository does not use GitHub Issues.
+  steps. Open a **GitHub issue**, or email **`support@talusgis.com`**.
 - **Security reports** — please **do not** send suspected vulnerabilities to `support@`;
   see `SECURITY.md` for private disclosure (`security@talusgis.com`, or GitHub's private
   vulnerability reporting on this repository).
@@ -47,4 +46,4 @@ including for your own organization's production use — subject to the license'
 ## Might this policy ever change?
 
 Possibly. If it does, code contributions will require a signed Contributor License Agreement,
-and this page will be updated first. Until then: email, not PRs.
+and this page will be updated first. Until then: issues, Discussions or email, not PRs.

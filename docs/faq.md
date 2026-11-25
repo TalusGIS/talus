@@ -66,8 +66,8 @@ file is pinned by content digest. Dependencies are kept current automatically in
 repository where Talus is developed, and the third-party CI action the published workflows use is
 pinned by commit hash.
 
-There is also no untrusted-contributor path: Talus is solo-maintained by design (the SQLite
-model — outside pull requests are declined automatically), so the most common real-world
+There is also no untrusted-contributor path: Talus is maintained by one person and takes no outside
+code (the SQLite model — outside pull requests are declined automatically), so the most common real-world
 open-source supply-chain compromise — a hijacked contributor — has no ingress.
 
 The honest remaining gap: release images are not yet cryptographically signed (no
@@ -86,13 +86,33 @@ lists them one by one.
 
 ## "Talus is AI-built — isn't that a risk?"
 
-Talus is developed with AI as the implementer, directed by a 25-year municipal GIS practitioner
+Talus is developed with AI as the implementer, directed by a 25-year GIS practitioner
 under a decision-before-code discipline: every substantive capability gets a written design
 decision before implementation, a security review, and negative tests for every new data path.
 "AI slop" is un-owned code; this is the inverse — the judgment is front-loaded and human, the
 implementation is reviewed, and the verification suite in this repository is the discipline's
 public face. Judge the result by the running system: fail-closed, audited, and testable on your
 own install.
+
+## Talus is one person. What happens if that person stops?
+
+Today Talus GIS is one person: a 25-year GIS practitioner, who directs the work
+and answers the mail. The plan is to add people as revenue allows. Until then, this is what protects
+you if that person is unavailable:
+
+- **Your data stays yours.** Your data stays in PostgreSQL on your own server, cannot be turned off,
+  and continues to function as usual. ArcGIS Pro and QGIS read every layer through the standard doors,
+  so you can save a copy in any format they write.
+- **Nothing checks in with us.** There is no license server and no update check. An installed server
+  keeps running whether or not Talus GIS exists.
+- **The core is open source.** Under the AGPLv3 you, or anyone you hire, can read the code, fix it and
+  run it for as long as you like.
+- **Talus+ keeps working.** When a Talus+ term ends, nothing installed is disabled.
+- **The operations are documented.** Installing, upgrading, backing up and restoring each have
+  documentation in `docs/`, so the next person does not start from nothing.
+
+What this cannot cover: if development stopped, new features and security fixes would stop until
+someone else picked the code up. We would rather you knew that going in.
 
 ## Deployment and scale
 
@@ -251,7 +271,7 @@ if your term lapses, the Helper stops and everything else keeps running.
 and pace, never a meter. At the ceiling the AI pauses and we talk — a top-up or a larger allowance
 is a quote you accept, never an automatic charge. A daily cap stops a runaway in hours.
 
-**Talus Community?** No AI at all, structurally: the AI code is not in the public build; there is
+**Talus Community?** No AI features at all, structurally: the AI code is not in the public build; there is
 no token, no route, and no provider key anywhere in a Community install. An air-gapped Talus+
 likewise reports "not available in this environment" and keeps every non-AI module; the
 documentation is the manual path.

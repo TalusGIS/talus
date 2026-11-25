@@ -26,6 +26,28 @@ This is version 1.1. It has been tested on real municipal data: more than 12,000
 35,000 street segments, and county-wide parcels and aerial imagery. Each release is on the
 [Releases](https://github.com/TalusGIS/talus/releases) page, and `CHANGELOG.md` says what changed in each one.
 
+## How this is built
+
+Talus is built with [Claude Code](https://docs.claude.com/en/docs/claude-code/overview), an AI coding tool, doing the
+programming, directed by the project lead, a 25-year GIS practitioner. Every significant feature
+starts with a design discussion and a written decision before any code is written, and gets a security review; every
+new way of reaching data also gets tests that try to get past its access checks. Those tests are in this repository, so
+you can run them on your own server instead of taking our word for it.
+
+**Where the history is.** Development started in May 2026 in a private repository, which has more than 3,000 commits.
+This repository is published one release at a time: each release arrives here as a few commits, so the number of
+commits here counts releases, not the work behind them. `CHANGELOG.md` covers every release since the first beta in
+August 2026. Before a release is published it passes the API test suite and a license check of the third-party software
+it includes, and it's rehearsed as an upgrade on a running server before it's announced.
+
+**What the references in the code comments are.** Many comments name a document, such as `decision-layer-zoom-range.md
+§5`. Those are the written decisions described above. They are working documents kept in the private repository,
+because they also hold things that don't belong in public: customer names, server addresses, and how past security
+problems were found. Public versions of them, written for readers outside the project, are being added under
+[`docs/design/`](docs/design/), starting with the ones the code cites most. Where a comment cites a document that
+isn't there yet, the comment itself should still say why the code is the way it is; if one doesn't, that's a bug in
+the comment, and you're welcome to report it.
+
 ## What it does
 
 **Your data**
@@ -128,37 +150,24 @@ new bundle.
 getting backups off the server in a way you can trust, and keep [`docs/dr-restore-runbook.md`](docs/dr-restore-runbook.md)
 somewhere a disaster can't reach.
 
-**Questions, bugs and suggestions:** ask in [GitHub Discussions](https://github.com/TalusGIS/talus/discussions), or
-email support@talusgis.com. This repository doesn't use GitHub Issues. Every message is read by a person. Bugs are fixed
-in point releases rather than set aside, and suggestions get an answer. Never post a security problem in Discussions:
-report it privately, as [`SECURITY.md`](SECURITY.md) describes. How support works
+**Bugs:** open an [issue](https://github.com/TalusGIS/talus/issues). **Questions and suggestions:** ask in
+[GitHub Discussions](https://github.com/TalusGIS/talus/discussions). Or email support@talusgis.com for either. Every
+message is read by a person. Bugs are fixed in point releases rather than set aside, and suggestions get an answer.
+Never post a security problem in an issue or in Discussions: report it privately, as [`SECURITY.md`](SECURITY.md)
+describes. How support works
 for each edition: [`docs/support.md`](docs/support.md).
 
 ## The two editions
 
 | Edition | What you get | License |
 |---|---|---|
-| **Talus Community** | The full GIS: hosted layers and tables, web maps, editing, sharing, ArcGIS Pro, QGIS and QField connections, address search, imagery, backups and restore. No AI. | Open source (AGPLv3): this repository |
+| **Talus Community** | The full GIS: hosted layers and tables, web maps, editing, sharing, ArcGIS Pro, QGIS and QField connections, address search, imagery, backups and restore. No AI features. | Open source (AGPLv3): this repository |
 | **Talus+** | Everything in Community, plus support, the paid modules (dashboards, reports, story maps, and Talus Field, the field-collection app for phones that works offline), and the AI assists. The assists are a documentation assistant any signed-in user can ask, and a diagnose mode for administrators that reads a snapshot the administrator sees before it's sent. Diagnose mode is built but not yet field-tested; it explains, and never changes anything. Authoring helpers with single-feature Vision capture are on the roadmap and not built yet; they will suggest, never decide. | Commercial subscription |
 
 **Either edition can run with no internet connection at all.** That's a way of installing it, not a separate edition.
 A Talus+ server with no internet keeps every module and only loses the AI assists. No AI feature in this release changes
 your data or suggests changes to it. Every answer from the Talus Helper is labeled as written by AI and
 names the model and the versions of the prompt and documentation behind it.
-
-## How this is built
-
-Talus is built with [Claude Code](https://docs.claude.com/en/docs/claude-code/overview), an AI coding tool, doing the
-programming, directed by the project lead. Every significant feature starts with a design discussion and a written
-decision before any code is written, and gets a security review; every new way of reaching data also gets tests that
-try to get past its access checks. Those tests are in this repository, so you can run them on your own server instead of
-taking our word for it.
-
-This repository is published one release at a time. Talus is developed in a private repository, and each release
-arrives here as a few commits, so the number of commits here counts releases, not the development history.
-`CHANGELOG.md` covers every release since the first beta in August 2026. Before a release is published it passes the
-API test suite and a license check of the third-party software it includes, and it's rehearsed as an upgrade on a
-running server before it's announced.
 
 ## License
 
@@ -175,9 +184,10 @@ Copyright © 2026 Talus GIS LLC. The core is licensed under the GNU Affero Gener
 - **Talus+ modules and AI assists:** proprietary, run by Talus GIS LLC.
 - **The "Talus GIS" name:** U.S. trademark application pending (Serial No. 50129159), owned by Talus GIS LLC.
 
-Talus doesn't accept outside code contributions. It's maintained by one person on purpose, and like SQLite it doesn't take code
-from outside. Bug reports, feature requests and notes on how Talus works with other software are welcome by email. See
-[CONTRIBUTING.md](CONTRIBUTING.md).
+Talus doesn't accept outside code contributions. It's maintained by one person today, and like SQLite it doesn't take
+code from outside. Bug reports, feature requests and notes on how Talus works with other software are welcome, as
+issues, in Discussions or by email. See [CONTRIBUTING.md](CONTRIBUTING.md). What being one person means for you, and
+what protects you, is in the [FAQ](docs/faq.md#talus-is-one-person-what-happens-if-that-person-stops).
 
 ## Under the hood
 

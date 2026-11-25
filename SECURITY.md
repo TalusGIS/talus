@@ -7,7 +7,7 @@ vulnerability and what to expect from us.
 ## Reporting a vulnerability
 
 **Please report a security vulnerability privately, through one of the two channels below — not in a pull
-request, in GitHub Discussions, or in any other public place.** This repository does not use GitHub Issues.
+request, a GitHub issue, GitHub Discussions, or any other public place.**
 
 - **Preferred channel:** email **`security@talusgis.com`**. It is read by a person — no
   automation, no AI, nothing between your message and the maintainer. GitHub's **private

@@ -1,0 +1,50 @@
+name: Bug report
+description: Something in Talus does not work as the documentation says it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you. A bug report we can reproduce is the most useful thing you can send.
+        **Do not report a security problem here.** Use the private channels in SECURITY.md.
+        Talus does not take code from outside, so please describe the problem rather than opening a pull request.
+  - type: input
+    id: version
+    attributes:
+      label: Talus version
+      description: Shown on the Admin page, or the release you downloaded.
+      placeholder: v1.1.0
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where did you see it?
+      options:
+        - The demo at demo.talusgis.com
+        - My own install
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: What you did, one step per line. Say whether you were signed in.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and what happened instead
+    validations:
+      required: true
+  - type: input
+    id: client
+    attributes:
+      label: Browser or desktop client
+      description: For example Chrome 142, QGIS 3.40, ArcGIS Pro 3.5.
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: A screenshot helps. Leave out anything private, such as real names or server addresses.
