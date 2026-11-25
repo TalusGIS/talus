@@ -3,6 +3,22 @@
 All notable changes to Talus GIS are documented here. Versions follow semantic
 versioning; entries describe the product surface, not internal development history.
 
+## v1.1.2 (2026-11-25)
+
+One fix for public maps. **A new api image. No database migration.**
+
+### ★ Read before upgrading
+
+- **Upgrade by the standard procedure** in `docs/upgrade-runbook.md`, from 1.1.0 or 1.1.1. Take the `pg_dump -Fc`
+  its first step asks for.
+- **Talus+ needs the 1.1.2 bundle.** An earlier bundle is refused.
+
+### Fixed
+
+- **On a public map, a pop-up is titled with the layer's display field for a visitor who is not signed in.** It was
+  titled with the feature's internal id, while a signed-in user saw the display field, for example a parcel's
+  address. Nothing needs setting again: the display field each layer already has is used.
+
 ## v1.1.1 (2026-11-25)
 
 Three fixes to the web map, reported by people trying the public demo, and one to the installer. **No database
