@@ -3,6 +3,31 @@
 All notable changes to Talus GIS are documented here. Versions follow semantic
 versioning; entries describe the product surface, not internal development history.
 
+## v1.1.3 (2026-11-25)
+
+Two small changes to maps. **A new api image. No database migration.**
+
+### ★ Read before upgrading
+
+- **Upgrade by the standard procedure** in `docs/upgrade-runbook.md`, from 1.1.0, 1.1.1 or 1.1.2. Take the
+  `pg_dump -Fc` its first step asks for.
+- **Talus+ needs the 1.1.3 bundle.** An earlier bundle is refused.
+
+### Changed
+
+- **Every legend in the Layers panel starts shown.** Since v1.1.1 a legend of more than 12 values started hidden
+  until you clicked the caret on its layer's row. It now starts shown like any other, and the panel scrolls. The
+  caret still hides a legend you don't want to see.
+
+### Fixed
+
+- **A layer's display field is checked each time it is used.** If the starred field was later retired, or a view
+  was redefined without that column, pop-ups and search results were still pointed at the old name and fell back
+  to the feature's internal id. They now use the layer's first text field, the same as a layer with no star.
+- **On a public map, a visitor who is not signed in is not pointed at an editor column.** If a layer's starred field
+  was "created by" or "updated by", which visitors are never sent, their pop-up was titled with the feature's
+  internal id. It is now titled with the layer's first text field. Signed-in users see no change.
+
 ## v1.1.2 (2026-11-25)
 
 One fix for public maps. **A new api image. No database migration.**
