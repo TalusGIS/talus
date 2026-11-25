@@ -3,6 +3,37 @@
 All notable changes to Talus GIS are documented here. Versions follow semantic
 versioning; entries describe the product surface, not internal development history.
 
+## v1.1.1 (2026-11-25)
+
+Three fixes to the web map, reported by people trying the public demo, and one to the installer. **No database
+migration.**
+
+### ★ Read before upgrading
+
+- **Upgrade by the standard procedure** in `docs/upgrade-runbook.md`, from 1.1.0. Take the `pg_dump -Fc` its first
+  step asks for.
+- **Talus+ needs the 1.1.1 bundle.** The 1.1.0 bundle is refused.
+
+### Fixed
+
+- **The Layers panel stays inside the map.** On a map with long legends the panel ran past the bottom of the page.
+  It now scrolls, and a layer drawn by value has a caret on its row that shows or hides its legend. A legend of more
+  than 12 values starts hidden.
+- **The attribute table opens for a visitor who is not signed in.** On a public map it showed "Loading…" and never
+  finished. Signed out, the table is read-only and has no Export button; public data can be downloaded from the Open
+  Data page.
+- **A click identifies the polygon under it, not its neighbours.** A click inside one parcel could also return the
+  parcels beside it. Points and lines are as easy to hit as before.
+- **The installer recreates the edge on every `--edge` run**, so an upgraded server serves the new release's web
+  settings without the manual step the v1.1.0 note asked for.
+
+### Changed
+
+- **Bug reports go to GitHub Issues**, with a form. Questions and suggestions stay in Discussions, and security
+  reports stay private.
+- **Design notes.** `docs/design/` holds public versions of the design decisions that comments in the code refer
+  to, starting with the visible range of a layer.
+
 ## v1.1.0 (2026-11-24)
 
 Layers can be set to draw only at the zooms you choose. This release also tightens two picklist permissions and
