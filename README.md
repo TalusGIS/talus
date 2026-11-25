@@ -22,7 +22,7 @@ erased at 3 a.m. Eastern each night. Talus+ isn't installed on it.
 
 ## Where it stands
 
-This is version 1.0. It has been tested on real municipal data: more than 12,000 signs, over 300,000 address points,
+This is version 1.1. It has been tested on real municipal data: more than 12,000 signs, over 300,000 address points,
 35,000 street segments, and county-wide parcels and aerial imagery. Each release is on the
 [Releases](https://github.com/TalusGIS/talus/releases) page, and `CHANGELOG.md` says what changed in each one.
 
