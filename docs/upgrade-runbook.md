@@ -71,6 +71,13 @@ A normal upgrade takes **well under a minute** of installer time; the backup is 
   release's image; the 1.0.0 bundle is refused.
 - **Creating a picklist now needs the publisher or administrator role.** Accounts without it keep using existing
   picklists, and nothing already created changes.
+- **Recreate the edge after step 3.** The 1.1.0 installer leaves the running edge on the old Caddyfile, so on a
+  server with the portal (`--edge`) run this once after the installer finishes:
+  ```
+  docker compose --profile edge up -d --force-recreate caddy
+  ```
+  Talus+ servers can skip it, because applying the bundle recreates the edge. If you skip it on a Community server
+  the portal works as before, and only the new header that asks search engines not to list two paths is missing.
 
 ### Upgrading to v1.0.0 or later
 
