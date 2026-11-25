@@ -1,5 +1,5 @@
 ﻿====================================================================================================
-OPEN-SOURCE LICENSES — the Talus GIS browser application (v1.1.1)
+OPEN-SOURCE LICENSES — the Talus GIS browser application (v1.1.2)
 ====================================================================================================
 
 The Talus GIS browser application includes the open-source software below, each under its own

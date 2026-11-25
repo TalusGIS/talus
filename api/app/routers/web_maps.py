@@ -48,6 +48,7 @@ from ..authz import (
     set_object_shares,
 )
 from ..db import get_db
+from ..display_field import derive_display_fields
 from ..models.user import User
 from .layer_query import _VALID_OPS  # single source of truth for the filter-op whitelist
 from .metadata import metadata_complete
@@ -752,7 +753,13 @@ async def _anon_layers_meta(conn: AsyncConnection, definition: dict) -> list[dic
     public_object_allowed, the direct public_shared probe every anon read uses (fail-closed;
     a non-public layer is simply absent, so the SPA's F5 skip counts it as unavailable — the
     same outcome an authed non-viewer gets). Read-only affordances by construction: canEdit/
-    canManage are hardwired false for anon."""
+    canManage are hardwired false for anon.
+
+    displayField is the field a popup is titled with. Without it a signed-out visitor's popup fell
+    back to the feature's id while a signed-in user saw, say, the address. It is filled the way
+    /me/layers fills it: the owner's chosen field, else the first text field worked out at read time.
+    It is the NAME of a column of a layer that is itself public, and a public layer's column names
+    are already readable without a login (/layers/{id}/columns); no column value is added here."""
     ops = definition.get("operationalLayers") or []
     tables = definition.get("tables") or []
     lids = {o.get("layerId") for o in ops if isinstance(o, dict) and o.get("layerId")}
@@ -766,11 +773,13 @@ async def _anon_layers_meta(conn: AsyncConnection, definition: dict) -> list[dic
     async with conn.cursor() as cur:
         await cur.execute(
             "SELECT layer_id, display_name, display_color, renderer, geom_type, "
-            "       native_storage, working_srid, updated_at "
+            "       native_storage, working_srid, updated_at, display_field "
             "FROM platform.layers WHERE layer_id = ANY(%s)",
             (public_ids,),
         )
         rows = await cur.fetchall()
+    # Only for the layers whose owner has not chosen a field, and only for layers already found public.
+    derived = await derive_display_fields(conn, {r[0] for r in rows if r[8] is None})
     return [{
         "id": r[0], "canView": True, "canEdit": False, "canManage": False, "owner": False,
         "favorite": False, "editable": False, "deleteProtected": False,
@@ -778,6 +787,7 @@ async def _anon_layers_meta(conn: AsyncConnection, definition: dict) -> list[dic
         "geomType": r[4] or "point", "nativeStorage": bool(r[5]), "workingSrid": r[6],
         "renderMode": "features" if str(r[0]).startswith("vw_") else "tiles",
         "updated_at": r[7].isoformat() if r[7] is not None else None,
+        "displayField": r[8] if r[8] is not None else derived.get(r[0]),
     } for r in rows]
 
 
