@@ -103,3 +103,53 @@ async def derive_display_fields(conn: AsyncConnection, layer_ids: set[str]) -> d
             for table_name, column_name in await cur.fetchall():
                 derived[table_name] = column_name
     return derived
+
+
+async def _live_field_names(conn: AsyncConnection, layer_ids: set[str]) -> dict[str, set[str]]:
+    """layer_id -> the names that are fields of that layer TODAY: every real column of its table or
+    view except the geometry, plus every active owner-defined field. The same rule the star is checked
+    against when an owner sets it; here for a whole layer set in two queries."""
+    live: dict[str, set[str]] = {lid: set() for lid in layer_ids}
+    if not layer_ids:
+        return live
+    ids = sorted(layer_ids)
+    async with conn.cursor() as cur:
+        await cur.execute(
+            "SELECT table_name, column_name FROM information_schema.columns "
+            "WHERE table_schema = 'assets' AND table_name = ANY(%s) AND column_name <> 'geom'",
+            (ids,),
+        )
+        for table_name, column_name in await cur.fetchall():
+            live.setdefault(table_name, set()).add(column_name)
+        await cur.execute(
+            "SELECT layer_id, field_key FROM platform.layer_fields WHERE layer_id = ANY(%s) AND active",
+            (ids,),
+        )
+        for lid, field_key in await cur.fetchall():
+            live.setdefault(lid, set()).add(field_key)
+    return live
+
+
+async def effective_display_fields(
+    conn: AsyncConnection,
+    chosen: dict[str, str | None],
+    *,
+    withheld: frozenset[str] = frozenset(),
+) -> dict[str, str]:
+    """layer_id -> the field a feature of that layer is titled with, for the layers in `chosen`
+    (layer_id -> the owner's starred field, or None). A layer with nothing usable is absent.
+
+    The starred field is checked when an owner sets it and can go stale afterwards: the field is
+    retired, or a view is redefined without the column. So it is checked again here, on every read.
+    A star is kept only while it still names a field of the layer, and only if it is not in
+    `withheld`: the columns this caller is never sent. A signed-out visitor is not sent the editor
+    columns, and telling them to title a popup with one would leave the popup titled with an id.
+    Every other layer gets the worked-out default, the same as a layer that was never starred."""
+    starred = {lid: field for lid, field in chosen.items() if field}
+    live = await _live_field_names(conn, set(starred))
+    kept = {
+        lid: field for lid, field in starred.items()
+        if field in live.get(lid, ()) and field not in withheld
+    }
+    derived = await derive_display_fields(conn, {lid for lid in chosen if lid not in kept})
+    return {**derived, **kept}

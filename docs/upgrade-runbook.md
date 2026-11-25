@@ -64,6 +64,12 @@ A normal upgrade takes **well under a minute** of installer time; the backup is 
 
 ## Per-version notes
 
+### Upgrading to v1.1.3
+
+- **From 1.1.0, 1.1.1 or 1.1.2, by the standard procedure above.** No database migration; the upgrade pulls a new
+  api image.
+- **Talus+ needs the 1.1.3 bundle.** Apply it as step 2 of **Talus+ installs** below; an earlier bundle is refused.
+
 ### Upgrading to v1.1.2
 
 - **From 1.1.0 or 1.1.1, by the standard procedure above.** No database migration; the upgrade pulls a new api

@@ -16,7 +16,7 @@ from psycopg import AsyncConnection, sql
 from pydantic import BaseModel, Field
 
 from ..auth import _validated_claims, get_current_user
-from ..display_field import derive_display_fields
+from ..display_field import effective_display_fields
 from ..authz import (
     _layer_editable,
     _openfga_check,
@@ -298,7 +298,7 @@ async def my_layers(
                 nativeStorage=bool(native_storage),
                 workingSrid=int(working_srid),
                 geomType=geom_type or "point",
-                displayField=display_field,  # RAW here; the derived fallback is stamped in below
+                displayField=display_field,  # RAW here; the effective value is stamped in below
                 attachmentsEnabled=bool(attachments_enabled),
                 formConfig=form_config,
             )
@@ -306,10 +306,11 @@ async def my_layers(
     # Batch-resolve owner display names + feature counts in ONE query each (no N+1), then stamp.
     owner_names = await _resolve_user_names(conn, {lc.ownerId for lc in out if lc.ownerId})
     counts = await _layer_feature_counts(conn, {lc.id for lc in out})
-    # displayField (V072): where the RAW column was NULL, derive a first-text-field default at read time so
-    # the layer labels well with zero config (fork F2). Two batched queries, only for the unset layers; the
-    # SAME derivation the ESRI door uses (app/display_field.py) so web + ESRI agree on an unstarred layer.
-    derived_fields = await derive_display_fields(conn, {lc.id for lc in out if lc.displayField is None})
+    # displayField (V072): the owner's starred field while it is still a field of the layer, else a
+    # first-text-field default worked out at read time, so a layer labels well with no setup and a
+    # star left pointing at a retired field does not reach the browser. Batched for the whole list;
+    # the default is the SAME one the ESRI door uses (app/display_field.py), so the two agree.
+    display_fields = await effective_display_fields(conn, {lc.id: lc.displayField for lc in out})
     # View lineage (Talus 38): expose "view of <source>" ONLY when the caller can also view the source
     # (every layer in `out` is viewable by this caller) — never leak a private source's name to a
     # holder of just the view. display_names maps a layer id -> its label for the lineage text.
@@ -319,8 +320,7 @@ async def my_layers(
         if lc.ownerId:
             lc.ownerName = owner_names.get(lc.ownerId)
         lc.featureCount = counts.get(lc.id)
-        if lc.displayField is None:
-            lc.displayField = derived_fields.get(lc.id)  # effective = derived when the raw column was unset
+        lc.displayField = display_fields.get(lc.id)
         src = view_sources.get(lc.id)
         if src and src in viewable_ids:
             lc.sourceLayerId = src

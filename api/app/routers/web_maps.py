@@ -48,9 +48,12 @@ from ..authz import (
     set_object_shares,
 )
 from ..db import get_db
-from ..display_field import derive_display_fields
+from ..display_field import effective_display_fields
 from ..models.user import User
-from .layer_query import _VALID_OPS  # single source of truth for the filter-op whitelist
+from .layer_query import (
+    _ANON_SCRUB_COLUMNS,  # the columns a signed-out visitor is never sent
+    _VALID_OPS,  # single source of truth for the filter-op whitelist
+)
 from .metadata import metadata_complete
 
 log = structlog.get_logger(__name__)
@@ -758,6 +761,8 @@ async def _anon_layers_meta(conn: AsyncConnection, definition: dict) -> list[dic
     displayField is the field a popup is titled with. Without it a signed-out visitor's popup fell
     back to the feature's id while a signed-in user saw, say, the address. It is filled the way
     /me/layers fills it: the owner's chosen field, else the first text field worked out at read time.
+    A chosen field that no longer exists, or that is one of the editor columns a visitor is never
+    sent, is passed over for that default.
     It is the NAME of a column of a layer that is itself public, and a public layer's column names
     are already readable without a login (/layers/{id}/columns); no column value is added here."""
     ops = definition.get("operationalLayers") or []
@@ -778,8 +783,11 @@ async def _anon_layers_meta(conn: AsyncConnection, definition: dict) -> list[dic
             (public_ids,),
         )
         rows = await cur.fetchall()
-    # Only for the layers whose owner has not chosen a field, and only for layers already found public.
-    derived = await derive_display_fields(conn, {r[0] for r in rows if r[8] is None})
+    # Only for layers already found public. The owner's starred field is used while it is still a
+    # field of the layer and is one a visitor is sent; otherwise the worked-out default.
+    display = await effective_display_fields(
+        conn, {r[0]: r[8] for r in rows}, withheld=_ANON_SCRUB_COLUMNS,
+    )
     return [{
         "id": r[0], "canView": True, "canEdit": False, "canManage": False, "owner": False,
         "favorite": False, "editable": False, "deleteProtected": False,
@@ -787,7 +795,7 @@ async def _anon_layers_meta(conn: AsyncConnection, definition: dict) -> list[dic
         "geomType": r[4] or "point", "nativeStorage": bool(r[5]), "workingSrid": r[6],
         "renderMode": "features" if str(r[0]).startswith("vw_") else "tiles",
         "updated_at": r[7].isoformat() if r[7] is not None else None,
-        "displayField": r[8] if r[8] is not None else derived.get(r[0]),
+        "displayField": display.get(r[0]),
     } for r in rows]
 
 

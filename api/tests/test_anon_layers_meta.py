@@ -9,12 +9,15 @@ style: undo one thing and a named test goes red.
   * work out a default for a layer that has a choice    -> test_default_is_asked_only_for_unchosen_layers
   * read or return a layer that is not public           -> test_non_public_layer_is_never_read_or_returned
   * let a visitor edit or manage                        -> test_visitor_reply_stays_read_only
+  * send a starred name without checking it still exists -> test_starred_field_that_no_longer_exists_gives_the_default
+  * stop passing the withheld columns for a visitor      -> test_starred_editor_column_is_not_named_to_a_visitor
 
 asyncio.run(case()) idiom, as elsewhere in this suite (no pytest-asyncio).
 """
 import asyncio
 from datetime import datetime, timezone
 
+from app import display_field
 from app.routers import web_maps
 
 _WHEN = datetime(2026, 11, 25, tzinfo=timezone.utc)
@@ -24,9 +27,16 @@ _WHEN = datetime(2026, 11, 25, tzinfo=timezone.utc)
 _LAYERS = {
     "tal_public_chosen":   ("Parcels", "#aa0000", None, "polygon", True, 3857, _WHEN, "fulladdress"),
     "tal_public_unchosen": ("Hydrants", "#0000aa", None, "point", True, 3857, _WHEN, None),
+    "tal_public_editor":   ("Inspections", "#aa00aa", None, "point", True, 3857, _WHEN, "created_by"),
     "tal_private":         ("Staff notes", "#00aa00", None, "point", True, 3857, _WHEN, "secret_field"),
 }
-_PUBLIC = {"tal_public_chosen", "tal_public_unchosen"}
+_PUBLIC = {"tal_public_chosen", "tal_public_unchosen", "tal_public_editor"}
+# layer_id -> the fields the layer has today (what the database would say).
+_LIVE = {
+    "tal_public_chosen": {"id", "fulladdress", "notes", "created_by"},
+    "tal_public_editor": {"id", "notes", "created_by"},
+    "tal_private": {"id", "secret_field"},
+}
 
 
 class _AsyncCM:
@@ -59,11 +69,17 @@ class _FakeConn:
         return _FakeCursor(self)
 
 
-def _run(monkeypatch, layer_ids, derived=None):
+def _run(monkeypatch, layer_ids, derived=None, live=None):
     """Call _anon_layers_meta for a map naming `layer_ids`. Returns (reply, conn, ids the default was
-    asked for)."""
+    asked for). The real effective_display_fields runs; only its two database reads are faked:
+    `live` (layer -> the fields it has today) and `derived` (layer -> its worked-out default)."""
     conn = _FakeConn()
     derive_calls = []
+    fields_today = _LIVE if live is None else live
+
+    async def fake_live(_conn, ids):
+        conn.asked_ids.append(sorted(ids))
+        return {lid: set(fields_today.get(lid, ())) for lid in ids}
 
     async def fake_public(_conn, object_id, object_type="layer"):
         return object_id in _PUBLIC
@@ -73,7 +89,8 @@ def _run(monkeypatch, layer_ids, derived=None):
         return {lid: v for lid, v in (derived or {}).items() if lid in ids}
 
     monkeypatch.setattr(web_maps, "public_object_allowed", fake_public)
-    monkeypatch.setattr(web_maps, "derive_display_fields", fake_derive)
+    monkeypatch.setattr(display_field, "derive_display_fields", fake_derive)
+    monkeypatch.setattr(display_field, "_live_field_names", fake_live)
     definition = {"operationalLayers": [{"kind": "layer", "layerId": lid} for lid in layer_ids]}
     reply = asyncio.run(web_maps._anon_layers_meta(conn, definition))
     return reply, conn, derive_calls
@@ -128,3 +145,21 @@ def test_visitor_reply_stays_read_only(monkeypatch):
     for meta in reply:
         assert meta["canView"] is True
         assert meta["canEdit"] is False and meta["canManage"] is False and meta["editable"] is False
+
+
+def test_starred_field_that_no_longer_exists_gives_the_default(monkeypatch):
+    # The owner starred fulladdress, then the field was retired: the layer no longer has it.
+    reply, _, derive_calls = _run(
+        monkeypatch, ["tal_public_chosen"],
+        live={"tal_public_chosen": {"id", "notes"}}, derived={"tal_public_chosen": "notes"},
+    )
+    assert _by_id(reply)["tal_public_chosen"]["displayField"] == "notes"
+    assert derive_calls == [{"tal_public_chosen"}]
+    assert "fulladdress" not in str(reply)
+
+
+def test_starred_editor_column_is_not_named_to_a_visitor(monkeypatch):
+    # created_by is a real column and may be starred, but a visitor is never sent it.
+    reply, _, _ = _run(monkeypatch, ["tal_public_editor"], derived={"tal_public_editor": "notes"})
+    assert _by_id(reply)["tal_public_editor"]["displayField"] == "notes"
+    assert "created_by" not in str(reply)

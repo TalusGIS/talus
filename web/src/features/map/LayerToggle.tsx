@@ -49,11 +49,6 @@ export const RASTER_COLORMAPS: { value: string; label: string }[] = [
   { value: 'terrain', label: 'Terrain' },
 ]
 
-/** A legend with more rows than this starts hidden: a layer drawn
- *  by 40 values would otherwise push every layer under it out of sight. The reader opens it with the
- *  caret on the layer's row. A shorter legend starts shown, as it always was. */
-const LEGEND_STARTS_SHOWN_UP_TO = 12
-
 export interface LayerToggleProps {
   items: TocItem[]
   visible: Record<string, boolean>
@@ -107,8 +102,9 @@ export default function LayerToggle({
   rangeNotes,
   onZoomIntoRange,
 }: LayerToggleProps) {
-  // Legends the reader has shown or hidden by hand, by layer id. Absent = the starting rule above.
-  // Kept for this visit only: it is not saved with the map.
+  // Legends the reader has hidden or shown again by hand, by layer id. Absent = shown: every legend
+  // starts open, however long, and the list scrolls inside the pane. The caret on a layer's row folds
+  // a long one away. Kept for this visit only: it is not saved with the map.
   const [legendShown, setLegendShown] = useState<Record<string, boolean>>({})
   if (items.length === 0) return null
   // The sketch row (always items[0] when present) is not reorderable and not in the draw-order
@@ -396,7 +392,7 @@ export default function LayerToggle({
           )
 
         const legendRows = stops.length + (r?.default ? 1 : 0)
-        const legendOpen = legendShown[c.id] ?? legendRows <= LEGEND_STARTS_SHOWN_UP_TO
+        const legendOpen = legendShown[c.id] ?? true
         const openMenu = menuHandler(c.id)
         const kebab = kebabFor(c.id, c.label)
 
