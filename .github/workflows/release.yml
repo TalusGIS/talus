@@ -147,10 +147,37 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # The Release text opens with this tag's own section of CHANGELOG.md (from its "## vX.Y.Z"
+          # heading to the next "## "), so a reader of the Releases page sees what changed and what to
+          # read before upgrading without opening another file. A tag with no section still gets a
+          # Release, with a pointer instead and a warning in the job: the tag is already pushed, and
+          # failing here would leave a release with no Release page at all.
+          # CHANGELOG.md is hard-wrapped, and a Release body renders every line break as a break, so the
+          # second awk joins each paragraph and list item back onto one line. A line that starts a block
+          # (heading, list item, table row, quote, code fence) starts a new line; code blocks pass as-is.
+          awk -v tag="$GITHUB_REF_NAME" '/^## / { if (on) exit; on = ($2 == tag); next } on' CHANGELOG.md \
+            | awk '
+                function flush() { if (buf != "") print buf; buf = "" }
+                /^ *```/ { flush(); print; fence = !fence; next }
+                fence { print; next }
+                /^[[:space:]]*$/ { flush(); print ""; next }
+                /^ *(#|[-*+] |[0-9]+[.)] |\||>)/ { flush(); buf = $0; if ($0 ~ /^ *(#|\|)/) flush(); next }
+                { line = $0; sub(/^ +/, "", line); buf = (buf == "") ? line : buf " " line }
+                END { flush() }' > release-notes.md
+          if ! grep -q '[^[:space:]]' release-notes.md; then
+            echo "::warning::CHANGELOG.md has no '## $GITHUB_REF_NAME' section; the Release text points to the file instead"
+            echo "Talus GIS $GITHUB_REF_NAME. See CHANGELOG.md." > release-notes.md
+          fi
+          cat >> release-notes.md <<NOTES
+
+          ---
+
+          The full history is in CHANGELOG.md. The source archive is self-contained (built web/dist committed; the api image is pulled from ghcr, digest-pinned in docker-compose.yml). SBOMs (CycloneDX, source + image) attached.
+
+          Third-party source: the api image includes components licensed under the GPL, LGPL and MPL. Their complete corresponding source is attached below: talus-api-${IMGVER}-third-party-source.tar (the components in section 2 of the image's notices) and talus-api-${IMGVER}-debian-source.tar (its Debian packages). Notices: NOTICES at the root of this release, talus-api-${IMGVER}-NOTICES.txt below, and /usr/share/doc/talus/NOTICES inside the image.
+          NOTES
           gh release create "$GITHUB_REF_NAME" \
             talus-sbom-source.cdx.json talus-sbom-image.cdx.json \
             "talus-api-${IMGVER}-NOTICES.txt" release-sources/*.tar \
             --title "Talus GIS $GITHUB_REF_NAME" \
-            --notes "Talus GIS $GITHUB_REF_NAME. See CHANGELOG.md. The source archive is self-contained (built web/dist committed; the api image is pulled from ghcr, digest-pinned in docker-compose.yml). SBOMs (CycloneDX, source + image) attached.
-
-          Third-party source: the api image includes components licensed under the GPL, LGPL and MPL. Their complete corresponding source is attached below: talus-api-${IMGVER}-third-party-source.tar (the components in section 2 of the image's notices) and talus-api-${IMGVER}-debian-source.tar (its Debian packages). Notices: NOTICES at the root of this release, talus-api-${IMGVER}-NOTICES.txt below, and /usr/share/doc/talus/NOTICES inside the image."
+            --notes-file release-notes.md
