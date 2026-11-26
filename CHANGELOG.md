@@ -54,6 +54,7 @@ migration.**
 - **Upgrade by the standard procedure** in `docs/upgrade-runbook.md`, from 1.1.0. Take the `pg_dump -Fc` its first
   step asks for.
 - **Talus+ needs the 1.1.1 bundle.** The 1.1.0 bundle is refused.
+- **No 1.1.1 bundle was issued.** Talus+ servers go straight to 1.1.2.
 
 ### Fixed
 
